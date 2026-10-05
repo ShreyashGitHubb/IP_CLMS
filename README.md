@@ -105,6 +105,16 @@ Then open:
 - http://localhost:3000
 - backend health: http://localhost:8080/api/health
 
+## Authentication and deployment configuration
+
+The frontend sends authentication requests to `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8080`). Set it to the deployed backend origin when building the frontend.
+
+Public registration creates `MEMBER` accounts only. Passwords are stored using BCrypt. To provision an initial administrator, set `SEED_ADMIN=true`, `ADMIN_EMAIL`, and a strong `ADMIN_PASSWORD` on the backend before startup. Keep the seed option disabled after the initial administrator is provisioned.
+
+Configure `DATABASE_URL`, `PGUSER`, `PGPASSWORD`, and `DRIVER_CLASS_NAME` for the deployment database. The default H2 database is in-memory and is for local development only; its data is lost on restart.
+
+The current dashboard and operational views still contain sample inventory, request, and maintenance data. API-backed workflows, durable server-side sessions/JWT authorization, and deployment-specific database migrations must be completed before using this system for real lab operations or exposing it publicly. Do not treat the current authentication flow as complete production security.
+
 ## Backend endpoints
 
 The API is mapped under `/api`:
@@ -143,8 +153,9 @@ This project is intentionally structured for rapid iteration. It follows a produ
 2. Build full request approval workflows.
 3. Add transaction creation and return logic.
 4. Add filtering, sorting, and pagination for equipment and users.
-5. Add auth and role-based access control.
-6. Prepare production configuration for PostgreSQL and deployment.
+5. Connect inventory, requests, maintenance, and transactions to persistent API workflows.
+6. Add server-validated sessions and role-based access control to all protected endpoints.
+7. Prepare and verify production database migrations and deployment configuration.
 
 ## Team and documentation conventions
 

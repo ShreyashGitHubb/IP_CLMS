@@ -1,124 +1,169 @@
 'use client'
 
-import { usePathname, useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
-import {
-  Activity,
-  ArrowRight,
-  Bell,
-  BookOpen,
-  CalendarDays,
-  Check,
-  ChevronRight,
-  CircleHelp,
-  ClipboardList,
-  Clock3,
-  Database,
-  FileText,
-  Gauge,
-  HardDrive,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  Package,
-  Pencil,
-  Plus,
-  Search,
-  Settings2,
-  ShieldCheck,
-  SlidersHorizontal,
-  Sparkles,
-  Stethoscope,
-  Users,
-  Wrench,
-  X,
-} from 'lucide-react'
+import Link from 'next/link'
+import { ArrowRight, ClipboardList, Database, ShieldCheck, Sparkles, Users, Wrench } from 'lucide-react'
 
-const nav = [
-  { group: 'MANAGE', items: [
-    { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-    { label: 'Equipment', href: '/equipment', icon: Package },
-    { label: 'Requests', href: '/requests', icon: ClipboardList, count: '06' },
-    { label: 'Transactions', href: '/transactions', icon: ArrowRight },
-  ]},
-  { group: 'OPERATE', items: [
-    { label: 'Maintenance', href: '/maintenance', icon: Wrench },
-    { label: 'Students', href: '/students', icon: Users },
-    { label: 'Calendar', href: '/calendar', icon: CalendarDays },
-  ]},
-  { group: 'SYSTEM', items: [
-    { label: 'Reports', href: '/reports', icon: FileText },
-    { label: 'Settings', href: '/settings', icon: Settings2 },
-  ]},
+const features = [
+  { title: 'Inventory visibility', description: 'Track every device, lab station, and asset with clear status and availability info.', icon: Database },
+  { title: 'Request workflow', description: 'Approve or reject equipment requests with a clean operational queue and timeline.', icon: ClipboardList },
+  { title: 'Maintenance control', description: 'Keep equipment health, repairs, and service windows in one reliable place.', icon: Wrench },
+  { title: 'Student operations', description: 'Manage users, access, and active loans without spreadsheet chaos.', icon: Users },
 ]
 
-const equipment = [
-  { name: 'Arduino Uno R3', code: 'ARD-UNO-042', category: 'Microcontrollers', available: 14, total: 20, status: 'Available', icon: Activity },
-  { name: 'Digital Oscilloscope', code: 'OSC-DSO-018', category: 'Test & Measurement', available: 3, total: 8, status: 'Low stock', icon: Gauge },
-  { name: 'Raspberry Pi 4 Kit', code: 'RPI-KIT-029', category: 'Computing', available: 12, total: 16, status: 'Available', icon: HardDrive },
-  { name: 'Digital Multimeter', code: 'DMM-FLU-071', category: 'Test & Measurement', available: 0, total: 12, status: 'Maintenance', icon: SlidersHorizontal },
-]
-
-const requests = [
-  { student: 'Aniruddha Kulkarni', initials: 'AK', item: 'Raspberry Pi 4 Kit', purpose: 'IoT weather station', due: '14 Oct 2026', status: 'Pending', tone: 'pending' },
-  { student: 'Dishita Shah', initials: 'DS', item: 'Arduino Uno R3', purpose: 'Line following robot', due: '11 Oct 2026', status: 'Approved', tone: 'approved' },
-  { student: 'Sakshi Patil', initials: 'SP', item: 'Digital Oscilloscope', purpose: 'Signal analysis lab', due: '09 Oct 2026', status: 'Overdue', tone: 'overdue' },
-]
-
-function navigate(router: ReturnType<typeof useRouter>, href: string) { router.push(href) }
-
-export default function Page() {
-  const pathname = usePathname()
-  const router = useRouter()
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [showModal, setShowModal] = useState(false)
-  const [search, setSearch] = useState('')
-  const active = pathname === '/' ? '/' : pathname
-  const page = nav.flatMap((section) => section.items).find((item) => item.href === active)?.label ?? 'Dashboard'
-  const filteredEquipment = equipment.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()) || item.category.toLowerCase().includes(search.toLowerCase()))
-
-  const content = useMemo(() => {
-    if (pathname === '/equipment') return <EquipmentPage items={filteredEquipment} onAdd={() => setShowModal(true)} search={search} setSearch={setSearch} />
-    if (pathname === '/requests') return <RequestsPage />
-    if (pathname === '/transactions') return <TransactionsPage />
-    if (pathname === '/maintenance') return <MaintenancePage />
-    if (pathname === '/students') return <StudentsPage />
-    if (pathname === '/calendar') return <CalendarPage />
-    if (pathname === '/reports') return <ReportsPage />
-    if (pathname === '/settings') return <SettingsPage />
-    return <Dashboard onNavigate={(href) => navigate(router, href)} />
-  }, [pathname, filteredEquipment, search, router])
-
+export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-[#f2f2f4]">
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[236px] flex-col border-r border-white/[0.08] bg-[#111114] px-5 py-6 transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="mb-10 flex items-center justify-between"><button onClick={() => navigate(router, '/')} className="text-left"><div className="font-mono text-[10px] tracking-[0.24em] text-[#7c6cf6]">CLMS / 26</div><div className="mt-1 text-lg font-medium tracking-[-0.04em]">LAB / CONTROL</div></button><button className="lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X /></button></div>
-        <div className="flex flex-1 flex-col gap-7 overflow-y-auto">{nav.map((section) => <div key={section.group}><div className="mb-2 px-3 font-mono text-[9px] tracking-[0.18em] text-[#62626b]">{section.group}</div><div className="flex flex-col gap-1">{section.items.map((item) => { const Icon = item.icon; const isActive = active === item.href; return <button key={item.href} onClick={() => { navigate(router, item.href); setMobileOpen(false) }} className={`group flex items-center gap-3 border px-3 py-2.5 text-left text-[13px] transition ${isActive ? 'border-white/[0.1] bg-white/[0.06] text-white' : 'border-transparent text-[#9a9aa3] hover:bg-white/[0.04] hover:text-white'}`} aria-current={isActive ? 'page' : undefined}><Icon className={`size-4 ${isActive ? 'text-[#9b7bff]' : 'text-[#62626b]'}`} strokeWidth={1.5} /><span className="flex-1">{item.label}</span>{item.count && <span className="font-mono text-[9px] text-[#9b7bff]">{item.count}</span>}</button>})}</div></div>)}</div>
-        <div className="border border-white/[0.08] bg-[#141417] p-4"><div className="mb-2 flex items-center gap-2 font-mono text-[9px] tracking-[0.14em] text-[#9b7bff]"><Sparkles className="size-3" /> TODAY&apos;S FOCUS</div><p className="text-[12px] leading-5 text-[#9a9aa3]">Review pending requests before the afternoon lab session.</p><button onClick={() => navigate(router, '/requests')} className="mt-3 flex items-center gap-2 font-mono text-[9px] tracking-[0.12em] text-white hover:text-[#9b7bff]">OPEN QUEUE <ArrowRight className="size-3" /></button></div>
-      </aside>
-      {mobileOpen && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={() => setMobileOpen(false)} />}
-      <div className="lg:pl-[236px]"><header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-white/[0.08] bg-[#0a0a0c]/95 px-5 backdrop-blur-md md:px-10"><div className="flex items-center gap-4"><button className="lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu className="size-5" /></button><div><div className="font-mono text-[9px] tracking-[0.15em] text-[#62626b]">LABORATORY / {page.toUpperCase()}</div><div className="mt-1 text-sm text-[#f2f2f4]">{page}</div></div></div><div className="flex items-center gap-4"><div className="hidden items-center gap-2 border-r border-white/[0.08] pr-4 md:flex"><Clock3 className="size-3.5 text-[#62626b]" /><span className="font-mono text-[10px] text-[#9a9aa3]">OCT 05 · 10:42 IST</span></div><button className="relative text-[#9a9aa3] hover:text-white" aria-label="Notifications"><Bell className="size-[18px]" /><span className="absolute -right-1 -top-1 size-1.5 rounded-full bg-[#7c6cf6]" /></button><div className="flex items-center gap-2 border-l border-white/[0.08] pl-4"><div className="flex size-8 items-center justify-center bg-[#2a234d] font-mono text-[10px] text-[#c7beff]">SR</div><div className="hidden text-right md:block"><div className="text-xs">Shreyash R.</div><div className="font-mono text-[9px] text-[#62626b]">ADMIN</div></div><ChevronRight className="hidden size-3 rotate-90 text-[#62626b] md:block" /></div></div></header><main className="mx-auto max-w-[1180px] px-5 py-8 md:px-10 md:py-10">{content}</main></div>
-      {showModal && <AddEquipmentModal onClose={() => setShowModal(false)} />}
-    </div>
+    <main className="min-h-screen bg-[#0a0a0c] text-white">
+      <div className="mx-auto max-w-7xl px-6 py-8 md:px-8">
+        <header className="mb-16 flex items-center justify-between rounded-full border border-white/10 bg-[#111114]/80 px-5 py-4 backdrop-blur">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1a1528] text-[#b7aefc]">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#7c6cf6]">CLMS</div>
+              <div className="text-sm font-medium tracking-[-0.04em]">Lab Control</div>
+            </div>
+          </div>
+
+          <nav className="hidden items-center gap-6 text-sm text-[#b3b3bc] md:flex">
+            <a href="#features" className="transition hover:text-white">Features</a>
+            <a href="#workflow" className="transition hover:text-white">Workflow</a>
+            <a href="#security" className="transition hover:text-white">Security</a>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <Link href="/sign-in" className="rounded-full border border-white/10 px-4 py-2 text-sm text-[#dfe3ef] transition hover:border-[#7c6cf6]/50 hover:text-white">
+              Sign in
+            </Link>
+            <Link href="/sign-up" className="rounded-full bg-[#7c6cf6] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8e80ff]">
+              Create account
+            </Link>
+          </div>
+        </header>
+
+        <section className="grid items-center gap-10 pb-16 pt-8 lg:grid-cols-[1.1fr_0.9fr]">
+          <div>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#7c6cf6]/30 bg-[#171326] px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[#c6bdfd]">
+              <Sparkles className="h-3.5 w-3.5" />
+              Lab operations platform
+            </div>
+
+            <h1 className="max-w-xl text-5xl font-semibold tracking-[-0.08em] md:text-6xl">
+              Control every lab, request, and asset in one place.
+            </h1>
+
+            <p className="mt-6 max-w-xl text-lg leading-8 text-[#a5a7b2]">
+              CLMS helps colleges and training labs manage equipment, student borrowing, service issues, and daily operations with a modern control center built for real work.
+            </p>
+
+            <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+              <Link href="/sign-in" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#7c6cf6] px-6 py-3.5 text-sm font-medium text-white transition hover:bg-[#8e80ff]">
+                Access dashboard
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link href="/sign-up" className="inline-flex items-center justify-center rounded-xl border border-white/10 px-6 py-3.5 text-sm font-medium text-[#dfe3ef] transition hover:border-white/20 hover:text-white">
+                Get started
+              </Link>
+            </div>
+
+            <div className="mt-10 flex flex-wrap items-center gap-6 text-sm text-[#8a8b94]">
+              <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[#7fe3b0]" /> Available assets</div>
+              <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[#f2c879]" /> Maintenance tracking</div>
+              <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[#7c6cf6]" /> Student requests</div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-[#111114] p-6 shadow-2xl shadow-[#7c6cf6]/10">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8a8b94]">Sample workspace</div>
+                <div className="mt-2 text-2xl font-semibold tracking-[-0.05em]">Operations health</div>
+              </div>
+              <div className="rounded-full border border-[#7c6cf6]/20 bg-[#201a2d] px-3 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[#b7aefc]">
+                94% healthy
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-[#17181d] p-4">
+                <div className="text-sm text-[#a5a7b2]">Inventory</div>
+                <div className="mt-2 text-3xl font-semibold tracking-[-0.06em]">56</div>
+                <div className="mt-1 text-sm text-[#7fe3b0]">+4 this month</div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#17181d] p-4">
+                <div className="text-sm text-[#a5a7b2]">Open requests</div>
+                <div className="mt-2 text-3xl font-semibold tracking-[-0.06em]">06</div>
+                <div className="mt-1 text-sm text-[#f2c879]">3 require attention</div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#17181d] p-4">
+                <div className="text-sm text-[#a5a7b2]">Maintenance</div>
+                <div className="mt-2 text-3xl font-semibold tracking-[-0.06em]">04</div>
+                <div className="mt-1 text-sm text-[#ff8b8b]">2 in progress</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="features" className="pb-20">
+          <div className="mb-8 text-center">
+            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#7c6cf6]">What the system covers</div>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.06em] md:text-4xl">Built for everyday lab operations</h2>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {features.map(({ title, description, icon: Icon }) => (
+              <div key={title} className="rounded-2xl border border-white/10 bg-[#111114] p-5">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#1a1528] text-[#b7aefc]">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="text-xl font-medium tracking-[-0.04em]">{title}</h3>
+                <p className="mt-3 text-sm leading-6 text-[#a5a7b2]">{description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="workflow" className="pb-20">
+          <div className="rounded-3xl border border-white/10 bg-[#111114] p-8 md:p-10">
+            <div className="mb-8 text-center">
+              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#7c6cf6]">Workflow</div>
+              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.06em] md:text-4xl">From sign-in to actionable operations</h2>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-[#17181d] p-5">
+                <div className="mb-4 text-sm font-medium text-[#b7aefc]">01 · Sign in</div>
+                <p className="text-sm leading-6 text-[#a5a7b2]">Secure access to the lab dashboard with a real account flow and role-aware user identity.</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-[#17181d] p-5">
+                <div className="mb-4 text-sm font-medium text-[#b7aefc]">02 · Manage</div>
+                <p className="text-sm leading-6 text-[#a5a7b2]">Review inventory, requests, and maintenance tasks from interactive operational cards.</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-[#17181d] p-5">
+                <div className="mb-4 text-sm font-medium text-[#b7aefc]">03 · Act</div>
+                <p className="text-sm leading-6 text-[#a5a7b2]">Approve, schedule, and resolve issues with a clear system designed for daily lab work.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="security" className="pb-20">
+          <div className="rounded-3xl border border-white/10 bg-[#111114] p-8 md:p-10">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#7c6cf6]">Ready for work</div>
+                <h2 className="mt-3 text-3xl font-semibold tracking-[-0.06em]">Production-ready direction for a real deployment</h2>
+              </div>
+              <Link href="/sign-in" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#7c6cf6] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#8e80ff]">
+                Open app
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
   )
 }
-
-function Eyebrow({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) { return <div className="mb-3 flex items-center justify-between font-mono text-[9px] tracking-[0.16em] text-[#62626b]"><span>{children}</span>{right}</div> }
-function PageIntro({ eyebrow, title, desc, action }: { eyebrow: string; title: string; desc: string; action?: React.ReactNode }) { return <div className="mb-8 flex flex-col justify-between gap-5 border-b border-white/[0.08] pb-8 md:flex-row md:items-end"><div><div className="mb-3 font-mono text-[9px] tracking-[0.18em] text-[#7c6cf6]">{eyebrow}</div><h1 className="text-4xl font-normal tracking-[-0.05em] md:text-5xl">{title}</h1><p className="mt-3 max-w-xl text-sm leading-6 text-[#9a9aa3]">{desc}</p></div>{action}</div> }
-function PrimaryButton({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) { return <button onClick={onClick} className="inline-flex h-10 items-center gap-3 bg-[#7c6cf6] px-4 font-mono text-[10px] tracking-[0.1em] text-white transition hover:bg-[#8e80ff] focus:outline-none focus:ring-2 focus:ring-[#7c6cf6] focus:ring-offset-2 focus:ring-offset-[#0a0a0c]">{children}<ArrowRight className="size-3.5" /></button> }
-function OutlineButton({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) { return <button onClick={onClick} className="inline-flex h-9 items-center gap-2 border border-white/[0.16] px-3 font-mono text-[9px] tracking-[0.1em] text-[#f2f2f4] transition hover:border-white/40 hover:bg-white/[0.04]">{children}</button> }
-function Status({ children, tone }: { children: React.ReactNode; tone: string }) { return <span className={`inline-flex items-center gap-1.5 font-mono text-[9px] tracking-[0.08em] ${tone === 'approved' ? 'text-[#7fe3b0]' : tone === 'overdue' ? 'text-[#ff8b8b]' : tone === 'maintenance' ? 'text-[#f2c879]' : 'text-[#c7beff]'}`}><span className="size-1.5 rounded-full bg-current" />{children}</span> }
-
-function Dashboard({ onNavigate }: { onNavigate: (href: string) => void }) { return <><div className="mb-8 grid overflow-hidden border border-white/[0.08] bg-[#141417] md:grid-cols-[1fr_0.8fr]"><div className="relative p-7 md:p-10"><div className="mb-8 flex items-center gap-3"><span className="border border-[#7c6cf6]/50 px-2 py-1 font-mono text-[9px] tracking-[0.12em] text-[#9b7bff]">ADMIN CONSOLE</span><span className="font-mono text-[9px] text-[#62626b]">OCT 05, 2026</span></div><h1 className="max-w-md text-4xl font-normal leading-[1.04] tracking-[-0.06em] md:text-6xl">Good morning,<br /><span className="text-[#9b7bff]">Shreyash.</span></h1><p className="mt-5 max-w-md text-sm leading-6 text-[#9a9aa3]">Your laboratory is running smoothly. Here&apos;s what needs your attention today.</p></div><div className="relative hidden min-h-[260px] overflow-hidden bg-[#1b1729] md:block"><div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(rgba(155,123,255,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(155,123,255,.3) 1px, transparent 1px)', backgroundSize: '28px 28px' }} /><div className="absolute -right-10 top-8 h-48 w-72 rotate-[-12deg] bg-gradient-to-br from-[#ff6b8a] via-[#9b7bff] to-[#5aa2ff] opacity-80" style={{ clipPath: 'polygon(0 25%, 65% 0, 100% 25%, 100% 80%, 35% 100%, 0 75%)' }} /><div className="absolute bottom-8 left-10 h-28 w-36 rotate-[10deg] bg-gradient-to-br from-[#f2c879] to-[#ff6b8a] opacity-60" style={{ clipPath: 'polygon(0 20%, 70% 0, 100% 30%, 100% 90%, 30% 100%, 0 70%)' }} /></div></div><div className="mb-8 grid gap-5 md:grid-cols-[1.4fr_0.8fr]"><section className="border border-white/[0.08] bg-[#141417] p-6"><Eyebrow right={<span className="text-[#9b7bff]">2 / 5 COMPLETE</span>}>NEXT STEPS</Eyebrow><div className="mb-5 flex items-center justify-between border-b border-white/[0.08] pb-4"><span className="text-sm">Up next: Review open requests</span><span className="font-mono text-[9px] text-[#62626b]">TODAY</span></div><div className="flex flex-col">{[['Complete admin profile', 'DONE', true], ['Review open requests', 'OPEN QUEUE', false], ['Schedule maintenance', 'UPCOMING', false]].map(([label, action, done], i) => <div key={String(label)} className="flex items-center gap-3 border-b border-white/[0.08] py-4 last:border-0"><span className={`flex size-5 items-center justify-center border ${done ? 'border-[#7c6cf6] bg-[#7c6cf6] text-white' : 'border-white/20 text-transparent'}`}>{done ? <Check className="size-3" /> : <span className="size-1.5 rounded-full bg-white/20" />}</span><span className={`flex-1 text-sm ${done ? 'text-[#62626b] line-through' : ''}`}>{label}</span>{i === 1 ? <button onClick={() => onNavigate('/requests')} className="font-mono text-[9px] tracking-[0.08em] text-[#9b7bff]">{action} →</button> : <span className="font-mono text-[9px] text-[#62626b]">{action}</span>}</div>)}</div></section><section className="border border-white/[0.08] bg-[#141417] p-6"><Eyebrow>LAB STATUS</Eyebrow><div className="mb-5 flex items-end gap-2"><span className="font-mono text-5xl tracking-[-0.08em]">94</span><span className="mb-2 font-mono text-[9px] text-[#62626b]">/ 100 HEALTH</span></div><div className="h-1 bg-white/[0.08]"><div className="h-full w-[94%] bg-[#7c6cf6]" /></div><div className="mt-6 flex flex-col gap-4 text-sm"><div className="flex justify-between"><span className="text-[#9a9aa3]">Available equipment</span><span>82%</span></div><div className="flex justify-between"><span className="text-[#9a9aa3]">Active loans</span><span>18</span></div><div className="flex justify-between"><span className="text-[#9a9aa3]">Needs attention</span><span className="text-[#f2c879]">04</span></div></div></section></div><div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">{[['TOTAL EQUIPMENT','56','+4 this month',Package],['ACTIVE LOANS','18','3 due today',ArrowRight],['PENDING REQUESTS','06','needs review',ClipboardList],['MAINTENANCE','04','2 in progress',Wrench]].map(([label,value,meta,Icon]) => <button onClick={() => onNavigate(label === 'PENDING REQUESTS' ? '/requests' : label === 'MAINTENANCE' ? '/maintenance' : '/equipment')} key={String(label)} className="border border-white/[0.08] bg-[#141417] p-5 text-left transition hover:border-white/20"><div className="mb-5 flex items-center justify-between"><span className="font-mono text-[9px] tracking-[0.12em] text-[#62626b]">{label}</span><Icon className="size-4 text-[#62626b]" /></div><div className="font-mono text-3xl tracking-[-0.06em]">{value}</div><div className="mt-2 text-[11px] text-[#9a9aa3]">{meta}</div></button>)}</div><section className="border border-white/[0.08] bg-[#141417] p-6"><div className="mb-5 flex items-center justify-between"><Eyebrow>RECENT ACTIVITY</Eyebrow><button onClick={() => onNavigate('/transactions')} className="font-mono text-[9px] text-[#9b7bff]">VIEW ALL →</button></div>{requests.map((r) => <div key={r.student} className="flex flex-wrap items-center gap-4 border-t border-white/[0.08] py-4"><div className="flex size-8 items-center justify-center bg-[#272334] font-mono text-[9px] text-[#c7beff]">{r.initials}</div><div className="min-w-[180px] flex-1"><div className="text-sm">{r.student}</div><div className="mt-1 text-[11px] text-[#62626b]">{r.item} · {r.purpose}</div></div><div className="text-right"><Status tone={r.tone}>{r.status.toUpperCase()}</Status><div className="mt-1 font-mono text-[9px] text-[#62626b]">DUE {r.due}</div></div></div>)}</section></> }
-
-function EquipmentPage({ items, onAdd, search, setSearch }: { items: typeof equipment; onAdd: () => void; search: string; setSearch: (s: string) => void }) { return <><PageIntro eyebrow="INVENTORY / 56 ITEMS" title="Equipment" desc="Track every instrument, kit, and component across your college laboratories." action={<PrimaryButton onClick={onAdd}><Plus className="size-3.5" /> ADD EQUIPMENT</PrimaryButton>} /><div className="mb-5 flex flex-col justify-between gap-3 md:flex-row"><div className="flex items-center gap-2 border border-white/[0.12] bg-[#141417] px-3 md:w-80"><Search className="size-4 text-[#62626b]" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search equipment..." className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-[#62626b]" /></div><div className="flex gap-2"><OutlineButton><SlidersHorizontal className="size-3.5" /> FILTER</OutlineButton><OutlineButton>ALL STATUS <ChevronRight className="size-3 rotate-90" /></OutlineButton></div></div><div className="grid gap-4 md:grid-cols-2">{items.map((item) => { const Icon = item.icon; return <div key={item.code} className="border border-white/[0.08] bg-[#141417] p-5 transition hover:border-white/20"><div className="mb-7 flex items-start justify-between"><div className="flex size-11 items-center justify-center bg-[#211b3b] text-[#9b7bff]"><Icon className="size-5" strokeWidth={1.4} /></div><button aria-label={`Edit ${item.name}`} className="text-[#62626b] hover:text-white"><Pencil className="size-4" /></button></div><div className="font-mono text-[9px] tracking-[0.14em] text-[#62626b]">{item.category.toUpperCase()}</div><h3 className="mt-2 text-xl tracking-[-0.03em]">{item.name}</h3><div className="mt-1 font-mono text-[9px] text-[#62626b]">{item.code}</div><div className="mt-7 flex items-end justify-between border-t border-white/[0.08] pt-4"><div><span className="font-mono text-2xl">{item.available}</span><span className="ml-1 font-mono text-[9px] text-[#62626b]">/ {item.total} AVAILABLE</span></div><Status tone={item.status === 'Maintenance' ? 'maintenance' : item.status === 'Low stock' ? 'pending' : 'approved'}>{item.status.toUpperCase()}</Status></div></div>})}</div></> }
-
-function RequestsPage() { return <><PageIntro eyebrow="WORKFLOW / INBOX" title="Requests" desc="Review, approve, and coordinate equipment requests from students." action={<OutlineButton><SlidersHorizontal className="size-3.5" /> FILTER REQUESTS</OutlineButton>} /><div className="mb-6 grid grid-cols-3 gap-4">{[['PENDING','06','text-[#c7beff]'],['APPROVED','24','text-[#7fe3b0]'],['OVERDUE','03','text-[#ff8b8b]']].map(([l,v,c]) => <div key={l} className="border border-white/[0.08] bg-[#141417] p-5"><div className="font-mono text-[9px] tracking-[0.14em] text-[#62626b]">{l}</div><div className={`mt-3 font-mono text-3xl ${c}`}>{v}</div></div>)}</div><div className="border border-white/[0.08] bg-[#141417]">{requests.concat([{ student: 'Rahul Mehta', initials: 'RM', item: 'Digital Multimeter', purpose: 'Circuit diagnostics', due: '07 Oct 2026', status: 'Pending', tone: 'pending' }]).map((r, i) => <div key={r.student} className="flex flex-col gap-4 border-b border-white/[0.08] p-5 last:border-0 md:flex-row md:items-center"><div className="flex size-9 items-center justify-center bg-[#272334] font-mono text-[9px] text-[#c7beff]">{r.initials}</div><div className="flex-1"><div className="text-sm">{r.student}</div><div className="mt-1 text-[11px] text-[#62626b]">Requested <span className="text-[#f2f2f4]">{r.item}</span> for {r.purpose}</div></div><div className="font-mono text-[9px] text-[#62626b]">DUE {r.due}</div><Status tone={r.tone}>{r.status.toUpperCase()}</Status>{r.status === 'Pending' ? <div className="flex gap-2"><OutlineButton>REVIEW</OutlineButton><button className="flex size-9 items-center justify-center bg-[#7c6cf6]" aria-label="Approve"><Check className="size-4" /></button></div> : <button className="text-[#62626b] hover:text-white" aria-label="More options"><ChevronRight className="size-4" /></button>}</div>)}</div></> }
-function TransactionsPage() { return <><PageIntro eyebrow="LOAN LEDGER / 42 RECORDS" title="Transactions" desc="A complete, auditable record of equipment issue and return activity." action={<OutlineButton><DownloadIcon /> EXPORT CSV</OutlineButton>} /><div className="border border-white/[0.08] bg-[#141417] p-5"><div className="mb-5 flex justify-between"><Eyebrow>ACTIVE LOANS</Eyebrow><span className="font-mono text-[9px] text-[#f2c879]">03 DUE TODAY</span></div>{[['TRX-2041','Aniruddha Kulkarni','Raspberry Pi 4 Kit','14 Oct 2026','On track'],['TRX-2038','Sakshi Patil','Digital Oscilloscope','09 Oct 2026','Overdue'],['TRX-2035','Dishita Shah','Arduino Uno R3','11 Oct 2026','On track'],['TRX-2029','Kunal Joshi','Networking Kit','06 Oct 2026','Due today']].map((t) => <div key={t[0]} className="grid gap-3 border-t border-white/[0.08] py-4 text-sm md:grid-cols-[0.8fr_1.4fr_1.4fr_1fr_0.8fr] md:items-center"><span className="font-mono text-[10px] text-[#62626b]">{t[0]}</span><span>{t[1]}</span><span className="text-[#9a9aa3]">{t[2]}</span><span className="font-mono text-[10px] text-[#9a9aa3]">{t[3]}</span><Status tone={t[4] === 'Overdue' ? 'overdue' : t[4] === 'Due today' ? 'pending' : 'approved'}>{t[4].toUpperCase()}</Status></div>)}</div></> }
-function DownloadIcon() { return <FileText className="size-3.5" /> }
-function MaintenancePage() { return <><PageIntro eyebrow="SERVICE DESK / 04 OPEN" title="Maintenance" desc="Keep a clear history of faults, repairs, and equipment service status." action={<PrimaryButton><Plus className="size-3.5" /> LOG INCIDENT</PrimaryButton>} /><div className="grid gap-4 md:grid-cols-3">{[['NEEDS ATTENTION','Digital Multimeter','DMM-FLU-071','Pending repair','maintenance'],['IN SERVICE','Soldering Station','SOL-HAK-014','Under observation','approved'],['SCHEDULED','Oscilloscope calibration','OSC-DSO-018','12 Oct 2026','pending']].map((m) => <div key={m[1]} className="border border-white/[0.08] bg-[#141417] p-5"><div className="mb-8 flex items-center justify-between"><div className="flex size-10 items-center justify-center bg-[#30291d] text-[#f2c879]"><Stethoscope className="size-5" /></div><Status tone={m[4]}>{m[0]}</Status></div><div className="font-mono text-[9px] text-[#62626b]">{m[2]}</div><h3 className="mt-2 text-lg">{m[1]}</h3><div className="mt-6 border-t border-white/[0.08] pt-4 text-[11px] text-[#9a9aa3]">{m[3]}</div></div>)}</div></> }
-function StudentsPage() { return <><PageIntro eyebrow="PEOPLE / 128 STUDENTS" title="Students" desc="Manage student access and view their current equipment activity." action={<OutlineButton><Users className="size-3.5" /> INVITE USER</OutlineButton>} /><div className="border border-white/[0.08] bg-[#141417]">{[['Shreyash Raut','shreyash@college.edu','Admin','Active'],['Aniruddha Kulkarni','aniruddha@college.edu','Student','2 active loans'],['Dishita Shah','dishita@college.edu','Student','1 active loan'],['Sakshi Patil','sakshi@college.edu','Student','Overdue item']].map((s, i) => <div key={s[0]} className="flex items-center gap-4 border-b border-white/[0.08] p-5 last:border-0"><div className={`flex size-9 items-center justify-center font-mono text-[9px] ${i === 0 ? 'bg-[#2a234d] text-[#c7beff]' : 'bg-[#202124] text-[#9a9aa3]'}`}>{s[0].split(' ').map(x => x[0]).join('')}</div><div className="flex-1"><div className="text-sm">{s[0]}</div><div className="mt-1 text-[11px] text-[#62626b]">{s[1]}</div></div><span className="hidden font-mono text-[9px] text-[#62626b] md:block">{s[2].toUpperCase()}</span><span className="font-mono text-[9px] text-[#9a9aa3]">{s[3]}</span><ChevronRight className="size-4 text-[#62626b]" /></div>)}</div></> }
-function CalendarPage() { return <><PageIntro eyebrow="SCHEDULE / OCTOBER 2026" title="Calendar" desc="Coordinate lab sessions, returns, and maintenance windows." action={<OutlineButton><Plus className="size-3.5" /> ADD EVENT</OutlineButton>} /><div className="grid gap-5 md:grid-cols-[1fr_0.7fr]"><div className="border border-white/[0.08] bg-[#141417] p-6"><div className="mb-6 flex items-center justify-between"><span className="text-sm">October 2026</span><div className="flex gap-2"><button className="border border-white/[0.12] p-2"><ChevronRight className="size-3 rotate-180" /></button><button className="border border-white/[0.12] p-2"><ChevronRight className="size-3" /></button></div></div><div className="grid grid-cols-7 gap-1 text-center font-mono text-[9px] text-[#62626b]">{['MO','TU','WE','TH','FR','SA','SU'].map(d => <span key={d} className="py-2">{d}</span>)}{Array.from({ length: 35 }, (_, i) => <span key={i} className={`relative flex size-9 items-center justify-center text-xs ${i === 4 ? 'bg-[#7c6cf6] text-white' : i === 11 || i === 18 ? 'text-[#f2f2f4]' : 'text-[#62626b]'}`}>{i < 3 ? '' : i - 2}{[11,18].includes(i) && <span className="absolute bottom-1 size-1 bg-[#9b7bff]" />}</span>)}</div></div><div className="border border-white/[0.08] bg-[#141417] p-6"><Eyebrow>UPCOMING</Eyebrow>{[['05','Lab session · Java FSD','10:00'],['07','Return deadline · 4 items','17:00'],['12','Oscilloscope calibration','09:30'],['14','Project review window','14:00']].map(e => <div key={e[0]} className="flex gap-4 border-t border-white/[0.08] py-4"><span className="font-mono text-xl text-[#9b7bff]">{e[0]}</span><div><div className="text-sm">{e[1]}</div><div className="mt-1 font-mono text-[9px] text-[#62626b]">OCTOBER · {e[2]}</div></div></div>)}</div></div></> }
-function ReportsPage() { return <><PageIntro eyebrow="INSIGHTS / EXPORTABLE" title="Reports" desc="Understand utilization, inventory health, and student activity at a glance." action={<OutlineButton><DownloadIcon /> DOWNLOAD REPORT</OutlineButton>} /><div className="grid gap-4 md:grid-cols-3">{[['UTILIZATION RATE','68%','+12.4% vs last month'],['AVG. RETURN TIME','4.2 days','-0.8 days vs last month'],['EQUIPMENT VALUE','$48,240','across 56 items']].map((x) => <div key={x[0]} className="border border-white/[0.08] bg-[#141417] p-6"><div className="font-mono text-[9px] tracking-[0.14em] text-[#62626b]">{x[0]}</div><div className="mt-4 font-mono text-3xl">{x[1]}</div><div className="mt-2 text-[11px] text-[#7fe3b0]">{x[2]}</div></div>)}</div><div className="mt-5 border border-white/[0.08] bg-[#141417] p-6"><Eyebrow>LOAN ACTIVITY / LAST 30 DAYS</Eyebrow><div className="mt-8 flex h-48 items-end gap-2 border-b border-white/[0.08] px-2">{[35,48,40,68,55,72,64,86,74,92,78,100,88,76,94,82,70,88,97,84,100,92,80,96].map((h, i) => <div key={i} className="flex-1 bg-[#7c6cf6]/70 transition hover:bg-[#9b7bff]" style={{ height: `${h}%` }} />)}</div></div></> }
-function SettingsPage() { return <><PageIntro eyebrow="SYSTEM / ADMIN ONLY" title="Settings" desc="Configure the laboratory workspace, notifications, and access policies." action={<PrimaryButton><Check className="size-3.5" /> SAVE CHANGES</PrimaryButton>} /><div className="grid gap-5 md:grid-cols-[0.7fr_1.3fr]"><div className="flex flex-col gap-1">{['Workspace profile','Notifications','Access policies','Data & exports'].map((x, i) => <button key={x} className={`flex items-center justify-between border px-4 py-3 text-left text-sm ${i === 0 ? 'border-white/[0.12] bg-[#141417] text-white' : 'border-transparent text-[#9a9aa3] hover:bg-white/[0.04]'}`}>{x}<ChevronRight className="size-3" /></button>)}</div><div className="border border-white/[0.08] bg-[#141417] p-6"><Eyebrow>WORKSPACE PROFILE</Eyebrow><div className="flex flex-col gap-5"><label className="flex flex-col gap-2 text-xs text-[#9a9aa3]">Workspace name<input defaultValue="Central College Laboratory" className="h-11 border border-white/[0.12] bg-[#0a0a0c] px-3 text-sm text-white outline-none focus:border-[#7c6cf6]" /></label><label className="flex flex-col gap-2 text-xs text-[#9a9aa3]">Institution code<input defaultValue="CCL / JAVA-FSD / 26" className="h-11 border border-white/[0.12] bg-[#0a0a0c] px-3 text-sm text-white outline-none focus:border-[#7c6cf6]" /></label><div className="flex items-center justify-between border-t border-white/[0.08] pt-5"><div><div className="text-sm">Require approval for all requests</div><div className="mt-1 text-[11px] text-[#62626b]">Students cannot collect items without staff approval.</div></div><div className="h-5 w-9 bg-[#7c6cf6] p-1"><div className="ml-auto size-3 bg-white" /></div></div></div></div></div></> }
-function AddEquipmentModal({ onClose }: { onClose: () => void }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-5 backdrop-blur-sm"><div className="w-full max-w-lg border border-white/[0.12] bg-[#141417] p-6"><div className="mb-6 flex items-start justify-between"><div><div className="font-mono text-[9px] tracking-[0.15em] text-[#7c6cf6]">INVENTORY / NEW RECORD</div><h2 className="mt-2 text-2xl tracking-[-0.04em]">Add equipment</h2></div><button onClick={onClose} aria-label="Close"><X className="size-5 text-[#62626b]" /></button></div><div className="grid gap-4"><label className="flex flex-col gap-2 text-xs text-[#9a9aa3]">Equipment name<input placeholder="e.g. Arduino Uno R3" className="h-11 border border-white/[0.12] bg-[#0a0a0c] px-3 text-sm text-white outline-none focus:border-[#7c6cf6]" /></label><div className="grid gap-4 md:grid-cols-2"><label className="flex flex-col gap-2 text-xs text-[#9a9aa3]">Category<input placeholder="Microcontrollers" className="h-11 border border-white/[0.12] bg-[#0a0a0c] px-3 text-sm text-white outline-none focus:border-[#7c6cf6]" /></label><label className="flex flex-col gap-2 text-xs text-[#9a9aa3]">Quantity<input placeholder="10" type="number" className="h-11 border border-white/[0.12] bg-[#0a0a0c] px-3 text-sm text-white outline-none focus:border-[#7c6cf6]" /></label></div><label className="flex flex-col gap-2 text-xs text-[#9a9aa3]">Asset code<input placeholder="ARD-UNO-000" className="h-11 border border-white/[0.12] bg-[#0a0a0c] px-3 text-sm text-white outline-none focus:border-[#7c6cf6]" /></label></div><div className="mt-7 flex justify-end gap-3"><OutlineButton onClick={onClose}>CANCEL</OutlineButton><PrimaryButton onClick={onClose}>SAVE EQUIPMENT</PrimaryButton></div></div></div> }
