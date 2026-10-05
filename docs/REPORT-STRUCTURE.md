@@ -90,13 +90,31 @@ Describe relevant implementation qualities such as input validation, relational 
 
 ### 2.4 System Architecture
 
-Insert or redraw the **System Architecture** Mermaid diagram from the project [README](../README.md). Explain the major path:
+Use this architecture diagram in the report. It shows the application's major components and the backend persistence path:
 
-`Browser -> Next.js -> Spring Boot REST API -> Spring Data JPA/Hibernate -> relational database`
+```mermaid
+flowchart LR
+	Person[Lab staff or student] --> Browser[Web browser]
+	Browser --> Web[Next.js frontend<br/>Landing, sign-in, sign-up, dashboard]
+	Web -->|HTTP JSON<br/>NEXT_PUBLIC_API_URL| API[Spring Boot REST API]
+	API --> Auth[AuthController]
+	API --> Equip[EquipmentController<br/>EquipmentService]
+	API --> Users[UserController]
+	API --> Tx[TransactionController]
+	Auth --> UserRepo[UserRepository]
+	Equip --> EquipRepo[EquipmentRepository]
+	Users --> UserRepo
+	Tx --> TxRepo[TransactionRepository]
+	UserRepo --> ORM[Spring Data JPA / Hibernate]
+	EquipRepo --> ORM
+	TxRepo --> ORM
+	ORM --> DB[(H2 local database<br/>or configured relational DB)]
+	Schema[schema.sql] --> DB
+```
 
 Mention that the equipment API has a service layer, while some other controllers currently call repositories directly.
 
-**Figure 1 placeholder:** System architecture diagram.
+**Figure 1:** CLMS application architecture.
 
 ### 2.5 User Flow (Optional)
 
@@ -132,8 +150,10 @@ Include an endpoint table. Record observed status codes from your own run rather
 
 Include one representative API example. Use fabricated data and redact any credentials or tokens.
 
-**Request:** [Insert endpoint, method, headers, and JSON body.]  
-**Response:** [Insert HTTP status and relevant JSON response.]  
+**Request:** [Insert endpoint, method, headers, and JSON body.]
+
+**Response:** [Insert HTTP status and relevant JSON response.]
+
 **Explanation:** [Explain which controller/entity/database operation this demonstrates.]
 
 ### 3.4 Validation and Error Handling
@@ -160,9 +180,56 @@ Explain that local development uses an in-memory H2 database. State clearly that
 
 ### 4.2 Entity Relationship Diagram
 
-Insert or redraw the **Database Design** ER diagram from the project [README](../README.md). It shows `USERS`, `EQUIPMENT`, `TRANSACTIONS`, and `LOGS` and their declared relationships.
+Use this ER diagram in the report. It follows the table names, fields, and foreign keys declared in `backend/src/main/resources/schema.sql`.
 
-**Figure 6 placeholder:** Database ER diagram.
+```mermaid
+erDiagram
+	USERS {
+		BIGINT id PK
+		VARCHAR name
+		VARCHAR email UK
+		VARCHAR password_hash
+		VARCHAR role
+		TIMESTAMP created_at
+	}
+	EQUIPMENT {
+		BIGINT id PK
+		VARCHAR name
+		VARCHAR category
+		VARCHAR asset_tag UK
+		VARCHAR status
+		VARCHAR location
+		TEXT description
+		TIMESTAMP created_at
+	}
+	TRANSACTIONS {
+		BIGINT id PK
+		BIGINT equipment_id FK
+		BIGINT user_id FK
+		VARCHAR action
+		TIMESTAMP due_at
+		TIMESTAMP returned_at
+		TEXT notes
+		TIMESTAMP created_at
+	}
+	LOGS {
+		BIGINT id PK
+		BIGINT user_id FK "nullable"
+		VARCHAR action
+		VARCHAR entity_type
+		BIGINT entity_id
+		TEXT details
+		TIMESTAMP created_at
+	}
+
+	USERS ||--o{ TRANSACTIONS : performs
+	EQUIPMENT ||--o{ TRANSACTIONS : appears_in
+	USERS o|--o{ LOGS : associated_with
+```
+
+`PK` means primary key, `UK` means unique key, and `FK` means foreign key. `LOGS.user_id` is nullable. Each transaction references one user and one equipment record; each user or equipment record may be referenced by multiple transactions.
+
+**Figure 6:** CLMS database entity relationship diagram.
 
 ### 4.3 Tables, Keys, and Relationships
 
@@ -189,8 +256,10 @@ Show the complete persistence path:
 4. Confirm the same record in the database console or query result.
 5. For a transaction, use existing user and equipment IDs and show the foreign-key values.
 
-**Figure 7:** Database tables shown in H2 console.  
-**Figure 8:** Equipment row created through the API.  
+**Figure 7:** Database tables shown in H2 console.
+
+**Figure 8:** Equipment row created through the API.
+
 **Figure 9:** Transaction row linked to user and equipment (if demonstrated).
 
 ### 4.6 Database Limitations
@@ -250,33 +319,5 @@ Prioritize the next technical steps, for example:
 - Complete equipment request, issue, return, and maintenance workflows.
 - Configure a persistent production database and migration process.
 
-## References
+Tie each reported result and screenshot to the exact project version demonstrated.
 
-List official documentation, course material, and other sources used. Follow the citation format required by your institution. Add access dates if requested.
-
-## Appendices
-
-- **Appendix A — API examples:** Sanitized requests and responses or API-client collection.
-- **Appendix B — Additional screenshots:** Supporting evidence that does not fit in the main chapters.
-- **Appendix C — Contribution statement:** Member responsibilities, if required.
-
-## Screenshot and Figure Rules
-
-- Number each figure in order and cite it in the report text.
-- Add a caption that says what the evidence demonstrates, for example: `Figure 8. GET /api/equipment returns the equipment record created in Figure 7.`
-- Capture evidence from the actual running project. Do not fabricate API output, database rows, or UI state.
-- Keep text readable and crop out unrelated desktop content.
-- Use fabricated test records and redact passwords, tokens, personal information, and secrets.
-- Ensure diagrams match the implemented schema and API. The architecture and ER diagrams in the README are based on the current source/schema.
-
-## Final Submission Checklist
-
-- [ ] Cover page contains the correct group name and member details.
-- [ ] Report includes backend implementation evidence.
-- [ ] Report includes database schema and API-to-database integration evidence.
-- [ ] API write and read are both demonstrated for at least one record.
-- [ ] All screenshots are readable, genuine, numbered, and captioned.
-- [ ] Limitations are accurately stated.
-- [ ] PDF opens correctly and page numbers/table of contents are updated.
-- [ ] Final file is named using the group name, for example `A12.pdf`.
-- [ ] Only one group member uploads the PDF, as instructed.
