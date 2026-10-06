@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.metropolis.lab.LabEquipmentApplicationTests
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 19.64 s -- in com.metropolis.lab.LabEquipmentApplicationTests
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.63 s -- in com.metropolis.lab.LabEquipmentApplicationTests
