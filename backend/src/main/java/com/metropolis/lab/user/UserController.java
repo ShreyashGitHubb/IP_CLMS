@@ -6,7 +6,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = "${APP_ORIGIN:http://localhost:3000}")
 public class UserController {
   private final UserRepository repository;
   public UserController(UserRepository repository){this.repository = repository;}

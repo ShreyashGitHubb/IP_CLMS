@@ -3,6 +3,7 @@
 /home/shreyash/Documents/project/new CLMS/fd0f7afdb6cb0a62d7f2744b6ac39237/backend/src/main/java/com/metropolis/lab/auth/AuthInitializer.java
 /home/shreyash/Documents/project/new CLMS/fd0f7afdb6cb0a62d7f2744b6ac39237/backend/src/main/java/com/metropolis/lab/common/ApiExceptionHandler.java
 /home/shreyash/Documents/project/new CLMS/fd0f7afdb6cb0a62d7f2744b6ac39237/backend/src/main/java/com/metropolis/lab/common/ResourceNotFoundException.java
+/home/shreyash/Documents/project/new CLMS/fd0f7afdb6cb0a62d7f2744b6ac39237/backend/src/main/java/com/metropolis/lab/config/CorsConfig.java
 /home/shreyash/Documents/project/new CLMS/fd0f7afdb6cb0a62d7f2744b6ac39237/backend/src/main/java/com/metropolis/lab/equipment/Equipment.java
 /home/shreyash/Documents/project/new CLMS/fd0f7afdb6cb0a62d7f2744b6ac39237/backend/src/main/java/com/metropolis/lab/equipment/EquipmentController.java
 /home/shreyash/Documents/project/new CLMS/fd0f7afdb6cb0a62d7f2744b6ac39237/backend/src/main/java/com/metropolis/lab/equipment/EquipmentRepository.java

@@ -7,7 +7,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/equipment")
-@CrossOrigin(origins = "${APP_ORIGIN:http://localhost:3000}")
 public class EquipmentController {
   private final EquipmentService service;
   public EquipmentController(EquipmentService service){this.service=service;}

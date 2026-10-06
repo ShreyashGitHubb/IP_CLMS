@@ -17,7 +17,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "${APP_ORIGIN:http://localhost:3000}")
 public class AuthController {
   private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
   private final UserRepository userRepository;
