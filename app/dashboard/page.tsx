@@ -209,7 +209,7 @@ export default function DashboardPage() {
         </aside>
 
         <div className="h-full min-w-0 flex-1 overflow-y-auto overscroll-contain">
-          <header className="flex min-h-12 items-center justify-between gap-3 border-b border-white/10 bg-[#111113] px-4 sm:px-6">
+          <header className="sticky top-0 z-30 flex min-h-12 items-center justify-between gap-3 border-b border-white/10 bg-[#111113] px-4 sm:px-6">
             <div className="min-w-0">
               <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">Laboratory / {isAdmin ? 'Dashboard' : 'Member workspace'}</div>
               <div className="mt-0.5 text-[11px]">{isAdmin ? 'Dashboard' : 'My dashboard'}</div>
@@ -237,7 +237,7 @@ export default function DashboardPage() {
             </div>
           </header>
 
-          <nav aria-label="Dashboard sections" className="flex gap-2 overflow-x-auto border-b border-white/10 bg-[#141416] px-4 py-2 lg:hidden">
+          <nav aria-label="Dashboard sections" className="sticky top-12 z-20 flex gap-2 overflow-x-auto border-b border-white/10 bg-[#141416] px-4 py-2 lg:hidden">
             {navigation.filter((item) => !item.admin || isAdmin).map(({ label, href }) => (
               <Link key={label} href={href} className={`shrink-0 border px-3 py-1.5 text-[10px] ${label === 'Dashboard' ? 'border-[#9a80ff]/50 bg-[#9a80ff]/10 text-white' : 'border-white/10 text-[#c6c6cd]'}`}>{label === 'Transactions' && !isAdmin ? 'My activity' : label}</Link>
             ))}
