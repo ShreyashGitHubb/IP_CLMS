@@ -62,7 +62,7 @@ The MySQL profile builds the JDBC URL as:
 jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslMode=REQUIRED&serverTimezone=UTC
 ```
 
-Generate a signing secret (for example, `openssl rand -base64 48`) and set it as `AUTH_TOKEN_SECRET` in the backend host's secret environment settings. Keep it stable across deployments and identical on all backend instances; changing it invalidates existing 12-hour login tokens. Never expose it through a `NEXT_PUBLIC_*` variable or commit it to source control.
+Generate a signing secret (for example, `openssl rand -base64 48`) and set it as `AUTH_TOKEN_SECRET` in the backend host's secret environment settings. Keep it stable across deployments and identical on all backend instances; changing it invalidates existing 12-hour login tokens. If it is omitted, the service starts with a random in-memory key, but every restart invalidates all existing sessions and separate instances will not accept each other's tokens. Never expose it through a `NEXT_PUBLIC_*` variable or commit it to source control.
 
 `sslMode=REQUIRED` encrypts the database connection. For certificate and hostname verification, follow Aiven's current Java/MySQL Connector/J instructions and configure its CA certificate/trust store; do not assume encryption alone validates the server's identity.
 
