@@ -16,6 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -137,6 +138,19 @@ class AuthControllerTest {
   void invalidBearerTokenIsRejected() throws Exception {
     mockMvc.perform(get("/api/equipment").header("Authorization", "Bearer invalid.token"))
       .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void corsPreflightDoesNotRequireBearerAuthentication() throws Exception {
+    mockMvc.perform(options("/api/equipment")
+        .header("Origin", "https://ip-clms.vercel.app")
+        .header("Access-Control-Request-Method", "GET")
+        .header("Access-Control-Request-Headers", "authorization"))
+      .andExpect(status().isOk())
+      .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+        .string("Access-Control-Allow-Origin", "https://ip-clms.vercel.app"))
+      .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+        .string("Access-Control-Allow-Methods", org.hamcrest.Matchers.containsString("GET")));
   }
 
   @Test

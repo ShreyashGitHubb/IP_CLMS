@@ -27,6 +27,10 @@ public class AuthInterceptor implements HandlerInterceptor {
 
   @Override
   public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
+    if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+      return true;
+    }
+
     String authorization = request.getHeader("Authorization");
     String token = authorization != null && authorization.startsWith("Bearer ")
       ? authorization.substring(7).trim()
