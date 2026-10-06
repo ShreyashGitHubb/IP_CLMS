@@ -50,7 +50,7 @@ Set these on the backend host, not in frontend code:
 | `DB_USERNAME` | Aiven database username |
 | `DB_PASSWORD` | Aiven database password, stored as a secret |
 | `AUTH_TOKEN_SECRET` | Stable random secret of at least 32 bytes, shared by all backend instances |
-| `APP_ORIGIN` | Exact deployed frontend origin, for example `https://your-app.example.com` |
+| `APP_ORIGIN` | Optional additional frontend origin, for example `https://your-custom-domain.example.com` |
 | `SEED_ADMIN` | `false` normally; only enable when deliberately provisioning an initial admin |
 | `ADMIN_EMAIL` | Set only when admin seeding is enabled |
 | `ADMIN_PASSWORD` | Strong secret, set only when admin seeding is enabled |
@@ -86,13 +86,13 @@ Deploy the Next.js app to a frontend host such as Vercel. Set this environment v
 
 Redeploy/rebuild the frontend after setting it because `NEXT_PUBLIC_*` values are embedded into the browser bundle at build time.
 
-Set backend `APP_ORIGIN` to the exact frontend origin, including scheme and any custom domain, for example:
+The backend allows the production frontend origin `https://ip-clms.vercel.app`, project preview origins matching `https://ip-clms-*.vercel.app`, and local development by default. For a custom frontend domain, set backend `APP_ORIGIN` to that exact origin, including scheme, for example:
 
 ```text
 APP_ORIGIN=https://clms-team.vercel.app
 ```
 
-The controllers use this origin for CORS. If you have multiple frontend domains (production and preview), configure CORS to allow only the required origins; the current property is a single origin, so previews may need a separate configuration change.
+The backend uses these origins for CORS preflight and API responses. `APP_ORIGIN`, `APP_ORIGINS`, or `app.cors.allowed-origins` may add comma-separated exact origins; they do not remove the built-in production and project preview origins.
 
 ## 4. Confirm the deployed integration
 
