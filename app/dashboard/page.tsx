@@ -179,9 +179,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#101012] text-white">
-      <div className="mx-auto flex min-h-screen max-w-[1600px]">
-        <aside className="hidden w-40 shrink-0 border-r border-white/10 bg-[#171719] px-3 py-5 lg:flex lg:flex-col">
+    <main className="h-dvh overflow-hidden bg-[#101012] text-white">
+      <div className="mx-auto flex h-full max-w-[1600px] overflow-hidden">
+        <aside className="hidden h-full w-40 shrink-0 overflow-y-auto border-r border-white/10 bg-[#171719] px-3 py-5 lg:flex lg:flex-col">
           <a href="#overview" className="mb-9 px-2">
             <div className="font-mono text-[9px] uppercase tracking-[0.26em] text-[#9a80ff]">CLMS / 26</div>
             <div className="mt-1 text-sm font-medium tracking-tight">LAB / CONTROL</div>
@@ -208,7 +208,7 @@ export default function DashboardPage() {
           </a>
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div className="h-full min-w-0 flex-1 overflow-y-auto overscroll-contain">
           <header className="flex min-h-12 items-center justify-between gap-3 border-b border-white/10 bg-[#111113] px-4 sm:px-6">
             <div className="min-w-0">
               <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">Laboratory / {isAdmin ? 'Dashboard' : 'Member workspace'}</div>
