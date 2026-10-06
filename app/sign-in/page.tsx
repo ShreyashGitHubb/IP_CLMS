@@ -70,8 +70,11 @@ export default function SignInPage() {
               </div>
 
               <div className="relative rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b7aefc]">Institution access</div>
-                <div className="mt-3 text-sm leading-6 text-[#dfe3ef]">Sign in with your registered lab account. New users can create a member account from the sign-up page.</div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b7aefc]">Demo access</div>
+                <div className="mt-3 space-y-2 text-sm leading-6 text-[#dfe3ef]">
+                  <div><span className="font-medium text-white">Admin:</span> admin@clms.local / Admin@123</div>
+                  <div><span className="font-medium text-white">Member:</span> member@clms.local / Member@123</div>
+                </div>
               </div>
             </div>
 

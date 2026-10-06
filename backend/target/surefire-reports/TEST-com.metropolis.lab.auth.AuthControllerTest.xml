@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.metropolis.lab.LabEquipmentApplicationTests" time="19.64" tests="1" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.metropolis.lab.auth.AuthControllerTest" time="10.503" tests="2" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="17"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -45,7 +45,7 @@
     <property name="localRepository" value="/home/shreyash/.m2/repository"/>
     <property name="java.vendor.url.bug" value="https://bugs.launchpad.net/ubuntu/+source/openjdk-17"/>
     <property name="java.io.tmpdir" value="/tmp"/>
-    <property name="com.zaxxer.hikari.pool_number" value="1"/>
+    <property name="com.zaxxer.hikari.pool_number" value="2"/>
     <property name="java.version" value="17.0.20.1"/>
     <property name="user.dir" value="/home/shreyash/Documents/project/new CLMS/fd0f7afdb6cb0a62d7f2744b6ac39237/backend"/>
     <property name="os.arch" value="amd64"/>
@@ -62,9 +62,9 @@
     <property name="java.class.version" value="61.0"/>
     <property name="LOGGED_APPLICATION_NAME" value="[lab-equipment-api] "/>
   </properties>
-  <testcase name="contextLoads" classname="com.metropolis.lab.LabEquipmentApplicationTests" time="0.734">
-    <system-out><![CDATA[01:04:22.576 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.metropolis.lab.LabEquipmentApplicationTests]: LabEquipmentApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
-01:04:23.022 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.metropolis.lab.LabEquipmentApplication for test class com.metropolis.lab.LabEquipmentApplicationTests
+  <testcase name="registerMember_createsMemberAccountAndLoginWorks" classname="com.metropolis.lab.auth.AuthControllerTest" time="1.729">
+    <system-out><![CDATA[2026-10-07T01:04:41.857+05:30  INFO 51547 --- [lab-equipment-api] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.metropolis.lab.auth.AuthControllerTest]: AuthControllerTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-10-07T01:04:41.890+05:30  INFO 51547 --- [lab-equipment-api] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.metropolis.lab.LabEquipmentApplication for test class com.metropolis.lab.auth.AuthControllerTest
 
   .   ____          _            __ _ _
  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
@@ -75,34 +75,37 @@
 
  :: Spring Boot ::                (v3.4.4)
 
-2026-10-07T01:04:24.109+05:30  INFO 51547 --- [lab-equipment-api] [           main] c.m.lab.LabEquipmentApplicationTests     : Starting LabEquipmentApplicationTests using Java 17.0.20.1 with PID 51547 (started by shreyash in /home/shreyash/Documents/project/new CLMS/fd0f7afdb6cb0a62d7f2744b6ac39237/backend)
-2026-10-07T01:04:24.114+05:30  INFO 51547 --- [lab-equipment-api] [           main] c.m.lab.LabEquipmentApplicationTests     : The following 1 profile is active: "mysql"
-2026-10-07T01:04:25.923+05:30  INFO 51547 --- [lab-equipment-api] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
-2026-10-07T01:04:26.055+05:30  INFO 51547 --- [lab-equipment-api] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 109 ms. Found 3 JPA repository interfaces.
-2026-10-07T01:04:27.485+05:30  INFO 51547 --- [lab-equipment-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-2026-10-07T01:04:29.807+05:30  INFO 51547 --- [lab-equipment-api] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@4d4c1ba9
-2026-10-07T01:04:29.814+05:30  INFO 51547 --- [lab-equipment-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-2026-10-07T01:04:30.189+05:30  INFO 51547 --- [lab-equipment-api] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://mysql-b229911-shreyashvishwakarma0000-0c27.i.aivencloud.com:11435/defaultdb?sslMode=REQUIRED&serverTimezone=UTC (MySQL 8.4)
-2026-10-07T01:04:30.926+05:30  WARN 51547 --- [lab-equipment-api] [           main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.1.
-2026-10-07T01:04:31.784+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 2 migrations (execution time 00:00.754s)
-2026-10-07T01:04:33.207+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema `defaultdb`: 1
-2026-10-07T01:04:33.290+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.f.core.internal.command.DbMigrate      : Schema `defaultdb` is up to date. No migration necessary.
-2026-10-07T01:04:34.063+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
-2026-10-07T01:04:34.172+05:30  INFO 51547 --- [lab-equipment-api] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.11.Final
-2026-10-07T01:04:34.246+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
-2026-10-07T01:04:34.895+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
-2026-10-07T01:04:35.375+05:30  WARN 51547 --- [lab-equipment-api] [           main] org.hibernate.orm.deprecation            : HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
-2026-10-07T01:04:35.410+05:30  INFO 51547 --- [lab-equipment-api] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
-	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+2026-10-07T01:04:41.971+05:30  INFO 51547 --- [lab-equipment-api] [           main] c.m.lab.auth.AuthControllerTest          : Starting AuthControllerTest using Java 17.0.20.1 with PID 51547 (started by shreyash in /home/shreyash/Documents/project/new CLMS/fd0f7afdb6cb0a62d7f2744b6ac39237/backend)
+2026-10-07T01:04:41.971+05:30  INFO 51547 --- [lab-equipment-api] [           main] c.m.lab.auth.AuthControllerTest          : The following 1 profile is active: "mysql"
+2026-10-07T01:04:42.462+05:30  INFO 51547 --- [lab-equipment-api] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-07T01:04:42.498+05:30  INFO 51547 --- [lab-equipment-api] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 32 ms. Found 3 JPA repository interfaces.
+2026-10-07T01:04:42.901+05:30  INFO 51547 --- [lab-equipment-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-10-07T01:04:44.494+05:30  INFO 51547 --- [lab-equipment-api] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-2 - Added connection com.mysql.cj.jdbc.ConnectionImpl@75af5f2a
+2026-10-07T01:04:44.494+05:30  INFO 51547 --- [lab-equipment-api] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-10-07T01:04:44.945+05:30  INFO 51547 --- [lab-equipment-api] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://mysql-b229911-shreyashvishwakarma0000-0c27.i.aivencloud.com:11435/defaultdb?sslMode=REQUIRED&serverTimezone=UTC (MySQL 8.4)
+2026-10-07T01:04:45.945+05:30  WARN 51547 --- [lab-equipment-api] [           main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: MySQL 8.4 is newer than this version of Flyway and support has not been tested. The latest supported version of MySQL is 8.1.
+2026-10-07T01:04:46.726+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 2 migrations (execution time 00:00.685s)
+2026-10-07T01:04:48.028+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema `defaultdb`: 1
+2026-10-07T01:04:48.116+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.f.core.internal.command.DbMigrate      : Schema `defaultdb` is up to date. No migration necessary.
+2026-10-07T01:04:48.828+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-07T01:04:48.834+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-07T01:04:48.858+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-07T01:04:48.945+05:30  WARN 51547 --- [lab-equipment-api] [           main] org.hibernate.orm.deprecation            : HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-10-07T01:04:48.945+05:30  INFO 51547 --- [lab-equipment-api] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-2)']
 	Database driver: undefined/unknown
 	Database version: 8.4.8
 	Autocommit mode: undefined/unknown
 	Isolation level: undefined/unknown
 	Minimum pool size: undefined/unknown
 	Maximum pool size: undefined/unknown
-2026-10-07T01:04:37.313+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-2026-10-07T01:04:37.321+05:30  INFO 51547 --- [lab-equipment-api] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2026-10-07T01:04:39.356+05:30  INFO 51547 --- [lab-equipment-api] [           main] c.m.lab.LabEquipmentApplicationTests     : Started LabEquipmentApplicationTests in 16.006 seconds (process running for 18.445)
+2026-10-07T01:04:49.236+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-07T01:04:49.237+05:30  INFO 51547 --- [lab-equipment-api] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-07T01:04:49.751+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-10-07T01:04:49.751+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-07T01:04:49.755+05:30  INFO 51547 --- [lab-equipment-api] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-07T01:04:49.784+05:30  INFO 51547 --- [lab-equipment-api] [           main] c.m.lab.auth.AuthControllerTest          : Started AuthControllerTest in 7.881 seconds (process running for 28.873)
 ]]></system-out>
   </testcase>
+  <testcase name="registerAdmin_isRejected" classname="com.metropolis.lab.auth.AuthControllerTest" time="0.544"/>
 </testsuite>

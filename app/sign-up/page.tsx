@@ -11,6 +11,7 @@ export default function SignUpPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [role, setRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -29,7 +30,7 @@ export default function SignUpPage() {
       const response = await fetch(`${getApiBaseUrl()}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role: 'MEMBER' }),
+        body: JSON.stringify({ name, email, password, role }),
       })
 
       const payload = await response.json()
@@ -97,12 +98,26 @@ export default function SignUpPage() {
               />
             </label>
 
+            <label className="block text-sm text-[#dfe3ef]">
+              <span className="mb-2 block text-xs uppercase tracking-[0.14em] text-[#8a8b94]">Account type</span>
+              <select
+                value={role}
+                onChange={(event) => setRole(event.target.value as 'MEMBER' | 'ADMIN')}
+                className="h-12 w-full rounded-xl border border-white/10 bg-[#0f1014] px-4 text-sm outline-none transition focus:border-[#7c6cf6]"
+              >
+                <option value="MEMBER">Member</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </label>
+
             <div className="rounded-2xl border border-[#7c6cf6]/20 bg-[#171326] p-4 text-sm text-[#dfe3ef]">
               <div className="mb-2 flex items-center gap-2 font-medium text-[#b7aefc]">
                 <CheckCircle2 className="h-4 w-4" />
-                New accounts receive member access.
+                {role === 'ADMIN' ? 'Admin roles are reserved and require backend provisioning.' : 'New accounts receive member access.'}
               </div>
-              Administrators must provision staff access separately.
+              {role === 'ADMIN'
+                ? 'Self-service admin registration is blocked for security reasons.'
+                : 'Administrators must provision staff access separately.'}
             </div>
 
             {error ? (

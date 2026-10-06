@@ -15,15 +15,21 @@ public class AuthInitializer implements CommandLineRunner {
   private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
   private final String adminEmail;
   private final String adminPassword;
+  private final String memberEmail;
+  private final String memberPassword;
 
   public AuthInitializer(
     UserRepository userRepository,
     @Value("${app.auth.admin-email:admin@clms.local}") String adminEmail,
-    @Value("${app.auth.admin-password:Admin@123}") String adminPassword
+    @Value("${app.auth.admin-password:Admin@123}") String adminPassword,
+    @Value("${app.auth.member-email:member@clms.local}") String memberEmail,
+    @Value("${app.auth.member-password:Member@123}") String memberPassword
   ) {
     this.userRepository = userRepository;
     this.adminEmail = adminEmail;
     this.adminPassword = adminPassword;
+    this.memberEmail = memberEmail;
+    this.memberPassword = memberPassword;
   }
 
   @Override
@@ -35,6 +41,15 @@ public class AuthInitializer implements CommandLineRunner {
       admin.setPasswordHash(passwordEncoder.encode(adminPassword));
       admin.setRole("ADMIN");
       userRepository.save(admin);
+    }
+
+    if (userRepository.findByEmailIgnoreCase(memberEmail).isEmpty()) {
+      User member = new User();
+      member.setName("Demo Member");
+      member.setEmail(memberEmail);
+      member.setPasswordHash(passwordEncoder.encode(memberPassword));
+      member.setRole("MEMBER");
+      userRepository.save(member);
     }
   }
 }

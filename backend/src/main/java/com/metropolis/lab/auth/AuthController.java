@@ -11,13 +11,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+  private static final Set<String> ALLOWED_ROLES = Set.of("MEMBER", "ADMIN");
   private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
   private final UserRepository userRepository;
 
@@ -35,6 +38,13 @@ public class AuthController {
     Optional<User> existing = userRepository.findByEmailIgnoreCase(email);
     if (existing.isPresent()) {
       return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "An account with this email already exists."));
+    }
+
+    String requestedRole = normalizeRole(request.role());
+    if ("ADMIN".equals(requestedRole)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+        "error", "Admin accounts must be created by an existing administrator or a seed process."
+      ));
     }
 
     User user = new User();
@@ -62,8 +72,26 @@ public class AuthController {
     return ResponseEntity.ok(authResponse(user.get()));
   }
 
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException ex) {
+    return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+  }
+
   private String normalizeEmail(String email) {
     return email == null ? "" : email.trim().toLowerCase();
+  }
+
+  private String normalizeRole(String role) {
+    String normalized = role == null ? "" : role.trim();
+    if (normalized.isEmpty()) {
+      return "MEMBER";
+    }
+
+    normalized = normalized.toUpperCase(Locale.ROOT);
+    if (!ALLOWED_ROLES.contains(normalized)) {
+      throw new IllegalArgumentException("Role must be MEMBER or ADMIN.");
+    }
+    return normalized;
   }
 
   private Map<String, Object> authResponse(User user) {
