@@ -1,20 +1,25 @@
 package com.metropolis.lab.auth;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.metropolis.lab.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class AuthControllerTest {
 
   @Autowired
@@ -23,8 +28,16 @@ class AuthControllerTest {
   @Autowired
   private UserRepository userRepository;
 
+  @Autowired
+  private JdbcTemplate jdbcTemplate;
+
+  @Autowired
+  private ObjectMapper objectMapper;
+
   @BeforeEach
   void setUp() {
+    jdbcTemplate.update("DELETE FROM transactions");
+    jdbcTemplate.update("DELETE FROM equipment");
     userRepository.deleteAll();
   }
 
@@ -77,5 +90,81 @@ class AuthControllerTest {
         .content(body))
       .andExpect(status().isForbidden())
       .andExpect(jsonPath("$.error").value("Admin accounts must be created by an existing administrator or a seed process."));
+  }
+
+  @Test
+  void operationalEndpointsRequireAuthenticationAndRestrictAdminActions() throws Exception {
+    mockMvc.perform(get("/api/equipment"))
+      .andExpect(status().isUnauthorized());
+
+    String registerBody = """
+      {
+        "name": "Jane Member",
+        "email": "jane@example.edu",
+        "password": "Password123"
+      }
+      """;
+    String token = mockMvc.perform(post("/api/auth/register")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(registerBody))
+      .andExpect(status().isCreated())
+      .andReturn().getResponse().getContentAsString();
+    String bearerToken = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+      .readTree(token).get("token").asText();
+
+    mockMvc.perform(get("/api/equipment").header("Authorization", "Bearer " + bearerToken))
+      .andExpect(status().isOk());
+    mockMvc.perform(get("/api/transactions").header("Authorization", "Bearer " + bearerToken))
+      .andExpect(status().isOk());
+    mockMvc.perform(get("/api/users").header("Authorization", "Bearer " + bearerToken))
+      .andExpect(status().isForbidden());
+    mockMvc.perform(post("/api/equipment")
+        .header("Authorization", "Bearer " + bearerToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"name\":\"Scope\",\"category\":\"Test\",\"assetTag\":\"TEST-1\",\"location\":\"Lab\"}"))
+      .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void invalidBearerTokenIsRejected() throws Exception {
+    mockMvc.perform(get("/api/equipment").header("Authorization", "Bearer invalid.token"))
+      .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void memberCanOnlyReadTheirOwnTransactions() throws Exception {
+    String memberToken = registerMember("First Member", "first@example.edu");
+    Long memberId = userRepository.findByEmailIgnoreCase("first@example.edu").orElseThrow().getId();
+    registerMember("Second Member", "second@example.edu");
+    Long otherMemberId = userRepository.findByEmailIgnoreCase("second@example.edu").orElseThrow().getId();
+
+    jdbcTemplate.update(
+      "INSERT INTO equipment (name, category, asset_tag, status, location) VALUES (?, ?, ?, ?, ?)",
+      "Test Scope", "Test", "TEST-SCOPE-1", "AVAILABLE", "Lab"
+    );
+    Long equipmentId = jdbcTemplate.queryForObject(
+      "SELECT id FROM equipment WHERE asset_tag = ?", Long.class, "TEST-SCOPE-1"
+    );
+    jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, memberId, "BORROW");
+    jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, otherMemberId, "BORROW");
+
+    mockMvc.perform(get("/api/transactions").header("Authorization", "Bearer " + memberToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.length()").value(1))
+      .andExpect(jsonPath("$[0].userId").value(memberId));
+  }
+
+  private String registerMember(String name, String email) throws Exception {
+    String body = objectMapper.writeValueAsString(java.util.Map.of(
+      "name", name,
+      "email", email,
+      "password", "Password123"
+    ));
+    String response = mockMvc.perform(post("/api/auth/register")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(body))
+      .andExpect(status().isCreated())
+      .andReturn().getResponse().getContentAsString();
+    return objectMapper.readTree(response).get("token").asText();
   }
 }

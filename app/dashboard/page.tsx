@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import {
@@ -8,7 +7,6 @@ import {
   ArrowRight,
   Boxes,
   CalendarDays,
-  ChevronRight,
   Database,
   LogOut,
   Package,
@@ -36,10 +34,16 @@ type LoanTransaction = {
   createdAt: string
 }
 
+type LabUser = {
+  id: number
+  name: string
+  role: string
+}
+
 const navigation = [
-  { label: 'Overview', href: '#overview', icon: Activity },
+  { label: 'Dashboard', href: '#overview', icon: Activity },
   { label: 'Equipment', href: '#equipment', icon: Boxes },
-  { label: 'Activity', href: '#activity', icon: Database },
+  { label: 'Transactions', href: '#activity', icon: Database },
 ]
 
 const formatDate = (value: string | null) => {
@@ -55,6 +59,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [equipment, setEquipment] = useState<EquipmentItem[]>([])
   const [transactions, setTransactions] = useState<LoanTransaction[]>([])
+  const [labUsers, setLabUsers] = useState<LabUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -68,20 +73,30 @@ export default function DashboardPage() {
 
     const controller = new AbortController()
     const apiBaseUrl = getApiBaseUrl()
-    Promise.all([
-      fetch(`${apiBaseUrl}/api/equipment`, { signal: controller.signal }),
-      fetch(`${apiBaseUrl}/api/transactions`, { signal: controller.signal }),
-    ])
-      .then(async ([equipmentResponse, transactionResponse]) => {
-        if (!equipmentResponse.ok || !transactionResponse.ok) {
+    const headers = { Authorization: `Bearer ${session.token}` }
+    const dataRequests = [
+      fetch(`${apiBaseUrl}/api/equipment`, { headers, signal: controller.signal }),
+      fetch(`${apiBaseUrl}/api/transactions`, { headers, signal: controller.signal }),
+    ]
+    if (session.user.role === 'ADMIN') {
+      dataRequests.push(fetch(`${apiBaseUrl}/api/users`, { headers, signal: controller.signal }))
+    }
+    Promise.all(dataRequests)
+      .then(async (responses) => {
+        if (responses.some((response) => response.status === 401)) {
+          clearSession()
+          router.replace('/sign-in')
+          return
+        }
+        if (responses.some((response) => !response.ok)) {
           throw new Error('Could not load laboratory data. Please try again.')
         }
-        const [equipmentData, transactionData] = await Promise.all([
-          equipmentResponse.json() as Promise<EquipmentItem[]>,
-          transactionResponse.json() as Promise<LoanTransaction[]>,
-        ])
+        const equipmentData = await responses[0].json() as EquipmentItem[]
+        const transactionData = await responses[1].json() as LoanTransaction[]
+        const usersData = responses[2] ? await responses[2].json() as LabUser[] : []
         setEquipment(equipmentData)
         setTransactions(transactionData)
+        setLabUsers(usersData ?? [])
       })
       .catch((error: unknown) => {
         if (error instanceof Error && error.name === 'AbortError') return
@@ -105,12 +120,26 @@ export default function DashboardPage() {
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 6)
   const equipmentById = new Map(equipment.map((item) => [item.id, item]))
+  const userById = new Map(labUsers.map((item) => [item.id, item]))
+  const availabilityRate = equipment.length ? Math.round((availableEquipment.length / equipment.length) * 100) : 0
+  const attentionCount = maintenanceEquipment.length + overdueLoans.length
+  const nextSteps = isAdmin
+    ? [
+        { title: 'Review equipment in maintenance', detail: `${maintenanceEquipment.length} item${maintenanceEquipment.length === 1 ? '' : 's'} currently unavailable`, href: '#equipment', action: 'VIEW INVENTORY' },
+        { title: 'Review active loans', detail: `${activeLoans.length} active · ${overdueLoans.length} overdue`, href: '#activity', action: 'OPEN TRANSACTIONS' },
+        { title: 'Check available equipment', detail: `${availableEquipment.length} item${availableEquipment.length === 1 ? '' : 's'} ready to issue`, href: '#equipment', action: 'BROWSE CATALOGUE' },
+      ]
+    : [
+        { title: 'Browse available equipment', detail: `${availableEquipment.length} item${availableEquipment.length === 1 ? '' : 's'} ready to issue`, href: '#equipment', action: 'VIEW CATALOGUE' },
+        { title: 'Check your active loans', detail: `${activeLoans.length} active · ${overdueLoans.length} overdue`, href: '#activity', action: 'VIEW MY ACTIVITY' },
+      ]
+  const currentDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date())
   const stats = isAdmin
     ? [
         { label: 'Total equipment', value: equipment.length, detail: 'In the inventory', icon: Package },
-        { label: 'Available', value: availableEquipment.length, detail: 'Ready to issue', icon: ShieldCheck },
         { label: 'Active loans', value: activeLoans.length, detail: 'Not yet returned', icon: Database },
         { label: 'Maintenance', value: maintenanceEquipment.length, detail: 'Currently unavailable', icon: Wrench },
+        { label: 'Members', value: labUsers.filter((item) => item.role === 'MEMBER').length, detail: 'Registered lab accounts', icon: Activity },
       ]
     : [
         { label: 'Available equipment', value: availableEquipment.length, detail: 'In the lab catalogue', icon: Package },
@@ -129,218 +158,193 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0a0a0c] text-white">
-      <div className="mx-auto flex max-w-[1600px]">
-        <aside className="hidden min-h-screen w-[260px] border-r border-white/10 bg-[#0d0e12] p-5 lg:flex lg:flex-col">
-          <div className="mb-8 flex items-center gap-3">
-            <div className="rounded-lg border border-[#7c6cf6]/30 bg-[#161526] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.28em] text-[#b7aefc]">
-              CLMS
-            </div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#8a8b94]">/ {isAdmin ? 'Admin' : 'Member'}</div>
-          </div>
-
-          <div className="mb-6 font-mono text-[10px] uppercase tracking-[0.24em] text-[#8a8b94]">Workspace</div>
-          <nav aria-label="Dashboard sections" className="space-y-2">
-            {navigation.map(({ label, href, icon: Icon }, index) => {
-              const active = index === 0
-              return (
-                <a
-                  key={label}
-                  href={href}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${
-                    active ? 'bg-[#1b1a27] text-white shadow-inner shadow-[#7c6cf6]/10' : 'text-[#c7cad4] hover:bg-[#12151d]'
-                  }`}
-                >
-                  <Icon className="h-4 w-4 text-[#b7aefc]" />
-                  {isAdmin && label === 'Activity' ? 'Transactions' : label === 'Activity' ? 'My activity' : label}
-                </a>
-              )
-            })}
+    <main className="min-h-screen bg-[#101012] text-white">
+      <div className="mx-auto flex min-h-screen max-w-[1600px]">
+        <aside className="hidden w-40 shrink-0 border-r border-white/10 bg-[#171719] px-3 py-5 lg:flex lg:flex-col">
+          <a href="#overview" className="mb-9 px-2">
+            <div className="font-mono text-[9px] uppercase tracking-[0.26em] text-[#9a80ff]">CLMS / 26</div>
+            <div className="mt-1 text-sm font-medium tracking-tight">LAB / CONTROL</div>
+          </a>
+          <div className="mb-2 px-2 font-mono text-[8px] uppercase tracking-[0.24em] text-[#777780]">Manage</div>
+          <nav aria-label="Dashboard sections" className="space-y-1">
+            {navigation.map(({ label, href, icon: Icon }, index) => (
+              <a
+                key={label}
+                href={href}
+                aria-current={index === 0 ? 'page' : undefined}
+                className={`flex min-h-8 items-center gap-2 border px-2 text-[11px] transition ${index === 0 ? 'border-white/10 bg-white/[0.07] text-white' : 'border-transparent text-[#aaaab2] hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Icon className="h-3 w-3 text-[#9a80ff]" />
+                {label === 'Transactions' && !isAdmin ? 'My activity' : label}
+              </a>
+            ))}
           </nav>
-
-          <div className="mt-auto rounded-2xl border border-white/10 bg-[#111114] p-4">
-            <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.22em] text-[#8a8b94]">{isAdmin ? 'Inventory status' : 'Your account'}</div>
-            <div className="text-sm text-[#dfe3ef]">
-              {isLoading ? 'Loading laboratory data…' : loadError ? 'Data is temporarily unavailable.' : isAdmin ? `${availableEquipment.length} items ready to issue.` : `${activeLoans.length} active loan${activeLoans.length === 1 ? '' : 's'} on your account.`}
-            </div>
-            <a href={isAdmin ? '#equipment' : '#activity'} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#201a2d] px-3 py-2 text-sm font-medium text-[#b7aefc]">
-              {isAdmin ? 'Review inventory' : 'View my activity'} <ArrowRight className="h-4 w-4" />
-            </a>
+          <div className="mt-8 px-2 font-mono text-[8px] uppercase tracking-[0.24em] text-[#777780]">{isAdmin ? 'Operations' : 'Account'}</div>
+          <div className="mt-2 px-2 text-[10px] leading-4 text-[#9a9aa3]">
+            {isLoading ? 'Syncing with lab records…' : loadError ? 'API connection unavailable.' : isAdmin ? `${attentionCount} items need attention.` : `${activeLoans.length} active loan${activeLoans.length === 1 ? '' : 's'}.`}
           </div>
+          <a href={isAdmin ? '#equipment' : '#activity'} className="mt-auto border border-white/10 bg-[#131315] p-3 hover:border-[#9a80ff]/50">
+            <div className="mb-2 font-mono text-[8px] uppercase tracking-[0.18em] text-[#9a80ff]">{isAdmin ? 'Today’s focus' : 'Your workspace'}</div>
+            <div className="text-[10px] leading-4 text-[#c1c1c8]">{isAdmin ? 'Check inventory status and open loans.' : 'Review your loans and available equipment.'}</div>
+            <div className="mt-3 flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.08em]">Open view <ArrowRight className="h-3 w-3" /></div>
+          </a>
         </aside>
 
-        <div className="flex-1">
-          <header className="border-b border-white/10 bg-[#0d0e12] px-4 py-4 sm:px-6">
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8a8b94]">
-                Laboratory / {isAdmin ? 'administration' : 'member workspace'}
+        <div className="min-w-0 flex-1">
+          <header className="flex min-h-12 items-center justify-between gap-3 border-b border-white/10 bg-[#111113] px-4 sm:px-6">
+            <div className="min-w-0">
+              <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">Laboratory / {isAdmin ? 'Dashboard' : 'Member workspace'}</div>
+              <div className="mt-0.5 text-[11px]">{isAdmin ? 'Dashboard' : 'My dashboard'}</div>
+            </div>
+            <div className="flex items-center gap-3 sm:gap-5">
+              <div className="hidden items-center gap-2 font-mono text-[8px] uppercase tracking-[0.08em] text-[#9a9aa3] sm:flex">
+                <CalendarDays className="h-3 w-3" /> {currentDate}
               </div>
-
-              <div className="flex items-center gap-3">
-                <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-[#17181d] px-3 py-2 text-xs text-[#dfe3ef] md:flex">
-                  <span className={`h-2 w-2 rounded-full ${loadError ? 'bg-red-400' : isLoading ? 'bg-amber-300' : 'bg-[#7fe3b0]'}`} />
-                  {loadError ? 'API unavailable' : isLoading ? 'Loading data' : 'Live data'}
-                </div>
-
-                <div className="flex items-center gap-3 rounded-full border border-white/10 bg-[#17181d] px-3 py-2">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#2a234d] font-mono text-[10px] text-[#d8d0ff]">
-                    {user.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase()}
-                  </div>
-                  <div className="text-left">
-                    <div className="text-sm font-medium">{user.name}</div>
-                    <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8a8b94]">{user.role}</div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleLogout}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#17181d] px-3 py-2 text-sm text-[#dfe3ef] transition hover:border-red-500/50 hover:text-red-200"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </button>
+              <div className="hidden items-center gap-2 font-mono text-[8px] uppercase tracking-[0.08em] sm:flex">
+                <span className={`h-1.5 w-1.5 rounded-full ${loadError ? 'bg-red-400' : isLoading ? 'bg-amber-300' : 'bg-emerald-300'}`} />
+                <span className="text-[#9a9aa3]">{loadError ? 'API offline' : isLoading ? 'Syncing' : 'Connected'}</span>
               </div>
+              <div className="flex items-center gap-2 border-l border-white/10 pl-3">
+                <div className="flex h-6 w-6 items-center justify-center bg-[#2a2540] font-mono text-[8px] text-[#d8d0ff]">
+                  {user.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase()}
+                </div>
+                <div className="hidden sm:block">
+                  <div className="max-w-28 truncate text-[9px]">{user.name}</div>
+                  <div className="font-mono text-[7px] uppercase tracking-[0.14em] text-[#777780]">{user.role}</div>
+                </div>
+              </div>
+              <button onClick={handleLogout} aria-label="Log out" title="Log out" className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#bdbdc4] transition hover:border-red-400/40 hover:text-red-200">
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
             </div>
           </header>
 
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-            <section id="overview" className="mb-8 grid scroll-mt-6 gap-6 rounded-3xl border border-white/10 bg-[#111114] p-6 md:grid-cols-[1.4fr_0.9fr]">
-              <div>
-                <div className="mb-4 font-mono text-[9px] uppercase tracking-[0.2em] text-[#7c6cf6]">
-                  {isAdmin ? 'Admin console' : 'Member access'}
-                </div>
-                <h1 className="text-4xl font-semibold tracking-[-0.06em] md:text-6xl">
-                  {greeting},<br />
-                  {user.name.split(' ')[0]}.
-                </h1>
-                <p className="mt-4 max-w-xl text-base text-[#afafba]">
-                  {isAdmin
-                    ? 'Review the live equipment catalogue and recorded laboratory activity.'
-                    : 'Your workspace shows equipment availability and activity linked to your account.'}
-                </p>
-              </div>
+          <nav aria-label="Dashboard sections" className="flex gap-2 overflow-x-auto border-b border-white/10 bg-[#141416] px-4 py-2 lg:hidden">
+            {navigation.map(({ label, href }) => (
+              <a key={label} href={href} className="shrink-0 border border-white/10 px-3 py-1.5 text-[10px] text-[#c6c6cd]">{label === 'Transactions' && !isAdmin ? 'My activity' : label}</a>
+            ))}
+          </nav>
 
-              <div className="flex min-h-[180px] flex-col justify-between rounded-2xl border border-[#7c6cf6]/20 bg-gradient-to-br from-[#2b2540] via-[#17181d] to-[#111114] p-5">
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b7aefc]">{isAdmin ? 'Operations snapshot' : 'Account snapshot'}</div>
-                <div>
-                  <div className="text-3xl font-semibold tracking-[-0.04em]">{isLoading ? '…' : isAdmin ? equipment.length : activeLoans.length}</div>
-                  <p className="mt-2 max-w-xs text-sm text-[#c7c3d5]">
-                    {isAdmin ? 'equipment records currently in the catalogue' : 'active loan records associated with your account'}
-                  </p>
-                </div>
-              </div>
-            </section>
-
+          <div className="mx-auto max-w-[744px] px-4 py-6 sm:px-6 sm:py-7">
             {loadError ? (
-              <div role="alert" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-red-400/30 bg-red-950/30 px-4 py-3 text-sm text-red-100">
+              <div role="alert" className="mb-4 flex items-center justify-between gap-4 border border-red-400/30 bg-red-950/30 px-3 py-2 text-[11px] text-red-100">
                 <span>{loadError}</span>
                 <button type="button" onClick={() => window.location.reload()} className="shrink-0 underline underline-offset-4">Retry</button>
               </div>
             ) : null}
 
-            <section className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {stats.map(({ label, value, detail, icon: Icon }) => (
-                <div key={label} className="rounded-2xl border border-white/10 bg-[#111114] p-5">
-                  <div className="mb-5 flex items-center justify-between">
-                    <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-[#8a8b94]">{label}</div>
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1b1729] text-[#b7aefc]">
-                      <Icon className="h-4 w-4" />
-                    </div>
+            <section id="overview" className="mb-5 grid scroll-mt-4 border border-white/10 bg-[#1b1b1d] md:grid-cols-[1.2fr_1fr]">
+              <div className="flex min-h-52 flex-col justify-center px-6 py-7 sm:px-7">
+                <div className="mb-4 flex items-center gap-2 font-mono text-[8px] uppercase tracking-[0.16em] text-[#9a80ff]">
+                  <span className="border border-[#8b71ff] px-1.5 py-1">{isAdmin ? 'Admin console' : 'Member workspace'}</span>
+                  <span className="text-[#777780]">{currentDate}</span>
+                </div>
+                <h1 className="text-[34px] font-normal leading-[1.04] tracking-[-0.025em] sm:text-[40px]">
+                  {greeting},<br /><span className="text-[#9b78ff]">{user.name.split(' ')[0]}.</span>
+                </h1>
+                <p className="mt-4 max-w-sm text-[10px] leading-5 text-[#a3a3ab]">
+                  {isAdmin ? 'Review live inventory and recorded lab activity from your operations console.' : 'Review equipment availability and transactions linked to your lab account.'}
+                </p>
+              </div>
+              <div aria-hidden="true" className="relative min-h-44 overflow-hidden border-t border-white/10 bg-[#211c2b] md:border-l md:border-t-0" style={{ backgroundImage: 'linear-gradient(rgba(160,130,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(160,130,255,0.07) 1px, transparent 1px)', backgroundSize: '19px 19px' }}>
+                <div className="absolute right-[-4%] top-[10%] h-[62%] w-[48%] rotate-[-8deg] bg-gradient-to-br from-[#cc6ba9] to-[#715deb]" style={{ clipPath: 'polygon(18% 0, 100% 14%, 100% 78%, 58% 100%, 0 72%, 8% 30%)' }} />
+                <div className="absolute bottom-[12%] left-[9%] h-[30%] w-[27%] rotate-[5deg] bg-gradient-to-br from-[#c89a65] to-[#a44365]" style={{ clipPath: 'polygon(8% 10%, 75% 0, 100% 40%, 91% 100%, 23% 88%, 0 48%)' }} />
+              </div>
+            </section>
+
+            <section className="mb-5 grid gap-4 md:grid-cols-[1.55fr_0.9fr]">
+              <div className="border border-white/10 bg-[#1b1b1d] px-4 py-4 sm:px-5">
+                <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">Next steps</div>
+                    <h2 className="mt-1 text-[11px] font-medium">{isAdmin ? 'Live operations' : 'Your lab activity'}</h2>
                   </div>
-                  <div className="text-3xl font-semibold tracking-[-0.06em]">{isLoading ? '—' : value}</div>
-                  <div className="mt-2 text-sm text-[#a1a1ad]">{detail}</div>
+                  <div className="font-mono text-[7px] uppercase tracking-[0.12em] text-[#9a80ff]">{isLoading ? 'SYNCING' : `${nextSteps.length} ITEMS`}</div>
+                </div>
+                <div>
+                  {nextSteps.map((step, index) => (
+                    <div key={step.title} className={`flex items-center gap-3 py-2.5 ${index < nextSteps.length - 1 ? 'border-b border-white/[0.08]' : ''}`}>
+                      <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center border ${index === 0 && !isLoading ? 'border-[#8b71ff] bg-[#8b71ff] text-white' : 'border-white/20 text-transparent'}`}>
+                        <span className="text-[8px]">✓</span>
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[10px] text-[#eeeeef]">{step.title}</div>
+                        <div className="mt-1 truncate text-[8px] text-[#777780]">{isLoading ? 'Loading records…' : step.detail}</div>
+                      </div>
+                      <a href={step.href} className="hidden shrink-0 items-center gap-1 font-mono text-[7px] uppercase tracking-[0.08em] text-[#a487ff] sm:flex">
+                        {step.action} <ArrowRight className="h-2.5 w-2.5" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border border-white/10 bg-[#1b1b1d] px-4 py-4 sm:px-5">
+                <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">{isAdmin ? 'Lab status' : 'Account status'}</div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-[30px] leading-none">{isLoading ? '—' : isAdmin ? availabilityRate : activeLoans.length}</span>
+                  <span className="font-mono text-[7px] uppercase tracking-[0.08em] text-[#777780]">{isAdmin ? '/ availability' : 'active loans'}</span>
+                </div>
+                {isAdmin ? <div className="mt-3 h-[3px] bg-white/10"><div className="h-full bg-[#9a78ff] transition-all" style={{ width: `${isLoading ? 0 : availabilityRate}%` }} /></div> : null}
+                <div className="mt-3 space-y-2">
+                  <div className="flex justify-between text-[8px] text-[#96969f]"><span>{isAdmin ? 'Available equipment' : 'My transactions'}</span><span className="text-[#e5e5e9]">{isLoading ? '—' : isAdmin ? availableEquipment.length : myTransactions.length}</span></div>
+                  <div className="flex justify-between text-[8px] text-[#96969f]"><span>{isAdmin ? 'Active loans' : 'Overdue loans'}</span><span className={overdueLoans.length ? 'text-amber-300' : 'text-[#e5e5e9]'}>{isLoading ? '—' : isAdmin ? activeLoans.length : overdueLoans.length}</span></div>
+                  {isAdmin ? <div className="flex justify-between text-[8px] text-[#96969f]"><span>Needs attention</span><span className={attentionCount ? 'text-amber-300' : 'text-[#e5e5e9]'}>{isLoading ? '—' : attentionCount}</span></div> : null}
+                </div>
+              </div>
+            </section>
+
+            <section aria-label="Dashboard metrics" className="mb-5 grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+              {stats.map(({ label, value, detail, icon: Icon }) => (
+                <div key={label} className="min-h-[92px] border border-white/10 bg-[#1b1b1d] px-3.5 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-mono text-[7px] uppercase tracking-[0.16em] text-[#777780]">{label}</div>
+                    <Icon className="h-3 w-3 shrink-0 text-[#777780]" />
+                  </div>
+                  <div className="mt-3 text-[21px] leading-none">{isLoading ? '—' : value}</div>
+                  <div className="mt-2 text-[8px] text-[#96969f]">{detail}</div>
                 </div>
               ))}
             </section>
 
-            <section className="mb-8 grid gap-6 lg:grid-cols-[1.45fr_0.9fr]">
-              <div id="equipment" className="scroll-mt-6 rounded-2xl border border-white/10 bg-[#111114] p-6">
-                <div className="mb-6 flex items-center justify-between">
-                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#7c6cf6]">{isAdmin ? 'Inventory' : 'Available equipment'}</div>
-                  <span className="text-sm text-[#8a8b94]">{isLoading ? 'Loading…' : `${equipment.length} records`}</span>
+            <section className="grid gap-4 md:grid-cols-2">
+              <div id="equipment" className="scroll-mt-4 border border-white/10 bg-[#1b1b1d] p-4">
+                <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">{isAdmin ? 'Equipment inventory' : 'Available equipment'}</div>
+                    <h2 className="mt-1 text-[11px]">{isLoading ? 'Loading catalogue…' : `${isAdmin ? equipment.length : availableEquipment.length} records`}</h2>
+                  </div>
+                  <Package className="h-3.5 w-3.5 text-[#9a80ff]" />
                 </div>
-
-                <div className="space-y-3">
-                  {(isAdmin ? equipment : availableEquipment).slice(0, 6).map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-[#17181d] px-4 py-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{item.name}</div>
-                        <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[#8a8b94]">{item.assetTag} · {item.location}</div>
-                      </div>
-                      <div className={`shrink-0 rounded-full border px-3 py-1 font-mono text-[9px] uppercase tracking-[0.12em] ${item.status === 'AVAILABLE' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-[#7c6cf6]/20 bg-[#201a2d] text-[#b7aefc]'}`}>
-                        {item.status.replaceAll('_', ' ')}
-                      </div>
+                <div className="space-y-2">
+                  {(isAdmin ? equipment : availableEquipment).slice(0, 5).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 border-b border-white/[0.07] py-2 last:border-0">
+                      <div className="min-w-0"><div className="truncate text-[10px]">{item.name}</div><div className="mt-1 font-mono text-[7px] uppercase tracking-[0.1em] text-[#777780]">{item.assetTag} · {item.location}</div></div>
+                      <span className={`shrink-0 font-mono text-[7px] uppercase tracking-[0.08em] ${item.status === 'AVAILABLE' ? 'text-emerald-300' : item.status === 'MAINTENANCE' ? 'text-amber-300' : 'text-[#b49eff]'}`}>{item.status.replaceAll('_', ' ')}</span>
                     </div>
                   ))}
-                  {!isLoading && !loadError && (isAdmin ? equipment : availableEquipment).length === 0 ? (
-                    <p className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-[#8a8b94]">
-                      {isAdmin ? 'No equipment has been added yet.' : 'No equipment is currently available.'}
-                    </p>
-                  ) : null}
+                  {!isLoading && !loadError && (isAdmin ? equipment : availableEquipment).length === 0 ? <p className="py-5 text-center text-[9px] text-[#777780]">{isAdmin ? 'No equipment has been added yet.' : 'No equipment is currently available.'}</p> : null}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-[#111114] p-6">
-                <div className="mb-5 flex items-center justify-between">
-                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#7c6cf6]">{isAdmin ? 'Inventory health' : 'Loan summary'}</div>
-                  {isAdmin ? <Wrench className="h-4 w-4 text-[#b7aefc]" /> : <ShieldCheck className="h-4 w-4 text-[#b7aefc]" />}
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-xl border border-white/10 bg-[#17181d] p-4">
-                    <div className="text-sm">{isAdmin ? 'Items available' : 'Active loans'}</div>
-                    <div className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-[#b7aefc]">{isLoading ? '—' : isAdmin ? availableEquipment.length : activeLoans.length}</div>
+              <div id="activity" className="scroll-mt-4 border border-white/10 bg-[#1b1b1d] p-4">
+                <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">{isAdmin ? 'Recent transactions' : 'My transactions'}</div>
+                    <h2 className="mt-1 text-[11px]">{isLoading ? 'Loading activity…' : `${visibleTransactions.length} recorded`}</h2>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-[#17181d] p-4">
-                    <div className="text-sm">{isAdmin ? 'Items in maintenance' : 'Overdue loans'}</div>
-                    <div className={`mt-2 text-3xl font-semibold tracking-[-0.06em] ${overdueLoans.length ? 'text-amber-200' : 'text-[#dfe3ef]'}`}>
-                      {isLoading ? '—' : isAdmin ? maintenanceEquipment.length : overdueLoans.length}
-                    </div>
-                  </div>
-                  <p className="text-xs leading-5 text-[#8a8b94]">Counts are calculated from the current equipment and transaction records.</p>
+                  <Database className="h-3.5 w-3.5 text-[#9a80ff]" />
                 </div>
-              </div>
-            </section>
-
-            <section id="activity" className="scroll-mt-6 rounded-2xl border border-white/10 bg-[#111114] p-6">
-              <div className="mb-5 flex items-center justify-between">
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#7c6cf6]">
-                  {isAdmin ? 'Recent transactions' : 'My transactions'}
+                <div className="space-y-2">
+                  {recentTransactions.slice(0, 5).map((transaction) => {
+                    const item = equipmentById.get(transaction.equipmentId)
+                    const memberName = userById.get(transaction.userId)?.name ?? `Member #${transaction.userId}`
+                    const overdue = isActiveLoan(transaction) && transaction.dueAt && new Date(transaction.dueAt).getTime() < Date.now()
+                    const dateLabel = transaction.returnedAt ? 'Returned' : transaction.dueAt ? 'Due' : 'Recorded'
+                    return <div key={transaction.id} className="flex items-center justify-between gap-3 border-b border-white/[0.07] py-2 last:border-0"><div className="min-w-0"><div className="truncate text-[10px]">{item?.name ?? `Equipment #${transaction.equipmentId}`}</div><div className="mt-1 truncate text-[8px] text-[#777780]">{isAdmin ? `${memberName} · ` : ''}{transaction.action.replaceAll('_', ' ')}</div></div><span className={`shrink-0 text-right font-mono text-[7px] uppercase tracking-[0.08em] ${overdue ? 'text-amber-300' : transaction.returnedAt ? 'text-emerald-300' : 'text-[#b49eff]'}`}>{overdue ? 'Overdue' : `${dateLabel} ${formatDate(transaction.returnedAt ?? transaction.dueAt ?? transaction.createdAt)}`}</span></div>
+                  })}
+                  {!isLoading && !loadError && recentTransactions.length === 0 ? <p className="py-5 text-center text-[9px] text-[#777780]">{isAdmin ? 'No transactions have been recorded.' : 'No transactions are recorded for your account yet.'}</p> : null}
                 </div>
-                <span className="inline-flex items-center gap-2 text-sm text-[#8a8b94]">
-                  {isAdmin ? `${transactions.length} total` : `${myTransactions.length} total`} <ChevronRight className="h-4 w-4" />
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {recentTransactions.map((transaction) => {
-                  const item = equipmentById.get(transaction.equipmentId)
-                  const overdue = isActiveLoan(transaction) && transaction.dueAt && new Date(transaction.dueAt).getTime() < Date.now()
-                  return (
-                    <div key={transaction.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#17181d] p-4">
-                      <div className="min-w-0">
-                        <div className="font-medium">{item?.name ?? `Equipment #${transaction.equipmentId}`}</div>
-                        <div className="mt-1 text-sm text-[#a1a1ad]">
-                          {isAdmin ? `Member #${transaction.userId} · ` : ''}{transaction.action.replaceAll('_', ' ')}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#8a8b94]">{transaction.returnedAt ? 'Returned' : 'Due'}</div>
-                          <div className="mt-1 text-sm text-[#dfe3ef]">{formatDate(transaction.returnedAt ?? transaction.dueAt ?? transaction.createdAt)}</div>
-                        </div>
-                        <span className={`rounded-full border px-3 py-1 font-mono text-[9px] uppercase tracking-[0.12em] ${overdue ? 'border-amber-400/30 bg-amber-400/10 text-amber-200' : transaction.returnedAt ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-[#7c6cf6]/20 bg-[#201a2d] text-[#b7aefc]'}`}>
-                          {overdue ? 'Overdue' : transaction.returnedAt ? 'Returned' : 'Active'}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-                {!isLoading && !loadError && recentTransactions.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-[#8a8b94]">
-                    {isAdmin ? 'No transactions have been recorded.' : 'No transactions are recorded for your account yet.'}
-                  </p>
-                ) : null}
               </div>
             </section>
           </div>

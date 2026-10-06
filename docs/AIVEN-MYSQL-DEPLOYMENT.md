@@ -49,6 +49,7 @@ Set these on the backend host, not in frontend code:
 | `DB_NAME` | Aiven database name |
 | `DB_USERNAME` | Aiven database username |
 | `DB_PASSWORD` | Aiven database password, stored as a secret |
+| `AUTH_TOKEN_SECRET` | Stable random secret of at least 32 bytes, shared by all backend instances |
 | `APP_ORIGIN` | Exact deployed frontend origin, for example `https://your-app.example.com` |
 | `SEED_ADMIN` | `false` normally; only enable when deliberately provisioning an initial admin |
 | `ADMIN_EMAIL` | Set only when admin seeding is enabled |
@@ -60,6 +61,8 @@ The MySQL profile builds the JDBC URL as:
 ```text
 jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslMode=REQUIRED&serverTimezone=UTC
 ```
+
+Generate a signing secret (for example, `openssl rand -base64 48`) and set it as `AUTH_TOKEN_SECRET` in the backend host's secret environment settings. Keep it stable across deployments and identical on all backend instances; changing it invalidates existing 12-hour login tokens. Never expose it through a `NEXT_PUBLIC_*` variable or commit it to source control.
 
 `sslMode=REQUIRED` encrypts the database connection. For certificate and hostname verification, follow Aiven's current Java/MySQL Connector/J instructions and configure its CA certificate/trust store; do not assume encryption alone validates the server's identity.
 
@@ -99,9 +102,10 @@ The controllers use this origin for CORS. If you have multiple frontend domains 
 4. Read it back with `GET /api/equipment` and confirm it persists after restarting/redeploying the backend.
 5. Create and read a transaction using existing user and equipment IDs.
 6. Check the Aiven service metrics/logs for successful client connections.
-7. Delete any test records and accounts that should not remain.
+7. Confirm an unauthenticated request to `/api/equipment` is rejected, and that a member token cannot list users or create equipment.
+8. Delete any test records and accounts that should not remain.
 
-The dashboard's equipment, request, and maintenance figures are currently sample UI data; they do not yet read live database values. Successful deployment of the API does not mean those screens are connected to MySQL.
+The dashboard loads equipment and transaction records through the backend API. Member transaction reads are scoped to the authenticated member; equipment writes, user listing, and transaction creation require an administrator. Request approval, maintenance tracking, reports, calendar scheduling, and audit-event writing are not implemented as backend workflows.
 
 ## Troubleshooting
 
@@ -114,7 +118,7 @@ The dashboard's equipment, request, and maintenance figures are currently sample
 | Missing table error | Confirm `SPRING_PROFILES_ACTIVE=mysql`; the MySQL profile initializes `schema-mysql.sql` |
 | Browser CORS error | Set `APP_ORIGIN` to the exact frontend origin and redeploy backend |
 | Frontend calls localhost | Set `NEXT_PUBLIC_API_URL` to the public HTTPS backend URL and rebuild/redeploy frontend |
-| API responds but dashboard is static | This is the current frontend integration limitation; dashboard values are sample data |
+| Login works but dashboard APIs return `401` | Confirm the frontend sends the bearer token and that `AUTH_TOKEN_SECRET` is stable across backend instances/restarts |
 
 ## Security and cost notes
 
@@ -124,4 +128,5 @@ The dashboard's equipment, request, and maintenance figures are currently sample
 - Keep admin seeding disabled after the administrator account is provisioned; do not use the example default password in a public service.
 - Do not expose the H2 console in a production deployment.
 - Review Aiven's plan limits, billing, backups, and service lifecycle before relying on the database for persistent coursework data.
-- Authentication currently returns a generated token but does not validate it on protected API routes. Do not treat current API routes as authorization-protected for real sensitive data.
+- Operational API routes validate signed bearer tokens and enforce current role checks. Tokens expire after 12 hours; changing `AUTH_TOKEN_SECRET` invalidates them.
+- Browser tokens are stored in local storage. HTTPS is required, and production frontend security should include strong cross-site scripting protections.

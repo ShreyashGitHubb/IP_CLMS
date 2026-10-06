@@ -15,7 +15,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -23,9 +22,11 @@ public class AuthController {
   private static final Set<String> ALLOWED_ROLES = Set.of("MEMBER", "ADMIN");
   private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
   private final UserRepository userRepository;
+  private final AuthTokenService authTokenService;
 
-  public AuthController(UserRepository userRepository) {
+  public AuthController(UserRepository userRepository, AuthTokenService authTokenService) {
     this.userRepository = userRepository;
+    this.authTokenService = authTokenService;
   }
 
   @PostMapping("/register")
@@ -96,7 +97,7 @@ public class AuthController {
 
   private Map<String, Object> authResponse(User user) {
     return Map.of(
-      "token", UUID.randomUUID().toString(),
+      "token", authTokenService.issue(user),
       "user", Map.of(
         "id", user.getId(),
         "name", user.getName(),

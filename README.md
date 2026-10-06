@@ -8,7 +8,7 @@
 
 CLMS is a web application prototype for tracking laboratory users, equipment inventory, and equipment transactions. The repository contains a Next.js user interface and a Spring Boot REST API backed by a relational database schema.
 
-> **Implementation status:** The backend currently provides health, authentication, equipment, user-list, and transaction endpoints. The landing page, sign-in/sign-up forms, and dashboard routes exist. Much of the dashboard's operational content is sample UI data; it is not yet connected to live equipment and transaction APIs. See [Current Scope and Limitations](#current-scope-and-limitations) before presenting the project as production-ready.
+> **Implementation status:** The backend provides health, authentication, equipment, user-list, and transaction endpoints. Operational API routes require a signed bearer token and enforce administrator/member access rules. The dashboard reads live equipment and transaction data. Requests, maintenance workflows, reports, calendar scheduling, notifications, and audit-event writing are not implemented as backend features.
 
 ---
 
@@ -93,7 +93,7 @@ flowchart LR
 | `equipment` | Equipment model, repository, service, and REST controller | Equipment list, lookup, create, update, delete |
 | `user` | User model, repository, and REST controller | User list and email lookup for auth |
 | `transaction` | Transaction model and REST controller | Transaction list and create |
-| `auth` | Registration and login endpoints; optional admin seeding | Register and login only; no server-side authorization enforcement |
+| `auth` | Registration/login, signed tokens, request authentication, and optional admin seeding | Public member registration; 12-hour bearer tokens; database-backed user and role lookup |
 | `health` | API health response | Service status and timestamp |
 | `common` | Shared API exception handling and not-found exception | Error response support |
 | `log` | Audit-log entity | Table/model exists; automatic audit writing and log API are not implemented |
@@ -216,7 +216,7 @@ Content-Type: application/json
 }
 ```
 
-A successful registration returns HTTP `201 Created` with a user summary and a generated token. If a `role` is supplied in the request, it is ignored; self-registration cannot create an administrator.
+A successful registration returns HTTP `201 Created` with a user summary and a signed 12-hour bearer token. If a `role` is supplied in the request, it is ignored; self-registration cannot create an administrator. Configure `AUTH_TOKEN_SECRET` on deployed backend instances as a stable secret of at least 32 bytes so tokens remain verifiable across restarts and instances.
 
 ### Example equipment creation
 
@@ -263,10 +263,10 @@ sequenceDiagram
 | `/` | Project landing page | Available; overview values are illustrative sample content |
 | `/sign-in` | Submit email and password to `/api/auth/login` | Available; stores returned token and user data in browser local storage |
 | `/sign-up` | Create an account through `/api/auth/register` | Available; backend assigns member role |
-| `/dashboard` | Authenticated-in-browser dashboard view | Available; dashboard values and operational lists are sample data |
+| `/dashboard` | Role-aware operational overview | Reads equipment and transaction records from the API; members receive their own transaction list |
 | Other paths | Unimplemented routes | Show not-found page |
 
-### Authentication flow as currently implemented
+### Authentication and access flow
 
 ```mermaid
 flowchart TD
@@ -283,7 +283,7 @@ flowchart TD
     BrowserStore --> Dashboard[Dashboard route]
 ```
 
-This is an initial authentication flow, not complete production security: the generated token is not validated by protected backend routes, no Spring Security authorization filter is configured, and browser local storage is used. Do not claim that backend endpoints are protected by user roles.
+Operational API routes require a valid signed bearer token. The backend reloads the account and role from the database on each request; administrators can manage equipment, list users, and view/create transactions, while members can read equipment and only their own transactions. Public registration always creates a member account. The browser currently stores the token in local storage, so use HTTPS and protect the frontend against cross-site scripting; this project does not yet use an HttpOnly-cookie session, refresh-token flow, or account recovery workflow.
 
 ## 6. Run the Project
 
@@ -396,14 +396,16 @@ The backend test suite currently contains a Spring application-context startup t
 
 ### Not yet implemented or not verified for production
 
-- Dashboard equipment/request/maintenance figures are sample content and are not driven by the API.
+- The dashboard is connected to equipment and transaction endpoints; request and maintenance workflow features are not provided by the current backend.
 - Request approval, maintenance management, reports, calendar scheduling, notifications, and audit-log write workflows are not implemented as complete backend features.
 - The logs table/entity exists, but no service currently writes audit events and no log endpoint is exposed.
-- Login returns a generated token, but the API does not validate it or protect endpoints; role-based access control is not enforced.
+- Signed bearer tokens expire after 12 hours. A deployed backend must configure the same strong `AUTH_TOKEN_SECRET` across instances and restarts.
+- Browser local storage is used for the current client session; an HttpOnly-cookie session and refresh-token flow are not implemented.
+- Account recovery, invitation workflows, role changes, request approvals, maintenance records, calendar scheduling, and audit-event writing are not implemented as complete features.
 - Browser local storage is used for the current client session state.
 - H2 is in-memory and loses data when the backend stops.
 - PostgreSQL deployment configuration, migrations, and production deployment have not been demonstrated by the current test suite.
-- Automated tests do not yet cover API endpoint behavior, authorization, data constraints, or loan return scenarios.
+- Automated tests cover authentication and role restrictions, but do not cover every API data constraint, transaction lifecycle, or production deployment behavior.
 
 ## 10. Repository Layout
 
