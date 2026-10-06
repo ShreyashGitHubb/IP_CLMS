@@ -1,0 +1,46 @@
+CREATE TABLE IF NOT EXISTS users (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(30) NOT NULL DEFAULT 'MEMBER',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS equipment (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(160) NOT NULL,
+  category VARCHAR(80) NOT NULL,
+  asset_tag VARCHAR(80) NOT NULL UNIQUE,
+  status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE',
+  location VARCHAR(120) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_equipment_status (status)
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  equipment_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  action VARCHAR(30) NOT NULL,
+  due_at TIMESTAMP NULL,
+  returned_at TIMESTAMP NULL,
+  notes TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_transactions_user (user_id),
+  CONSTRAINT fk_transactions_equipment FOREIGN KEY (equipment_id) REFERENCES equipment(id),
+  CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS logs (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT NULL,
+  action VARCHAR(120) NOT NULL,
+  entity_type VARCHAR(80) NOT NULL,
+  entity_id BIGINT,
+  details TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_logs_created_at (created_at),
+  CONSTRAINT fk_logs_user FOREIGN KEY (user_id) REFERENCES users(id)
+);

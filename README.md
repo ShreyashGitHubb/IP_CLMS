@@ -4,7 +4,7 @@
 > **Primary assignment areas:** Backend implementation and database integration  
 > **Frontend:** Next.js 16, React 19, TypeScript  
 > **Backend:** Spring Boot 3.4.4, Java 17, Spring Data JPA  
-> **Database:** H2 for local development; PostgreSQL driver included
+> **Database:** H2 for local development; optional MySQL profile for Aiven deployment
 
 CLMS is a web application prototype for tracking laboratory users, equipment inventory, and equipment transactions. The repository contains a Next.js user interface and a Spring Boot REST API backed by a relational database schema.
 
@@ -49,8 +49,8 @@ Build a web-based foundation for laboratory operations with:
 | Styling and icons | Tailwind CSS 4, lucide-react | Application presentation and icons |
 | REST API | Spring Boot 3.4.4, Java 17 | HTTP endpoints and backend application logic |
 | Persistence | Spring Data JPA, Hibernate | Map backend entities and repository operations to database tables |
-| Local database | H2 in-memory, PostgreSQL compatibility mode | Local development and schema initialization |
-| Alternative database driver | PostgreSQL JDBC driver | Available dependency; PostgreSQL deployment still needs explicit configuration and validation |
+| Local database | H2 in-memory | Local development and schema initialization |
+| Deployment database | MySQL via MySQL Connector/J | Optional `mysql` Spring profile; Aiven setup is documented separately |
 | Frontend package manager | pnpm 12.3.4 | Install and run the web application |
 | Backend build | Maven | Compile, test, and run the API |
 
@@ -169,9 +169,9 @@ erDiagram
 
 ### Database configuration
 
-The default URL is an in-memory H2 database in PostgreSQL compatibility mode. It is useful for local demos and tests, but **all data disappears when the backend process stops**. The schema uses PostgreSQL-style `BIGSERIAL` and timestamp-with-time-zone types; the included backend tests verify startup against the configured H2 database.
+The default URL is an in-memory H2 database. It is useful for local demos and tests, but **all data disappears when the backend process stops**. Local startup uses `schema.sql`; the optional MySQL Spring profile uses the MySQL-compatible `schema-mysql.sql`.
 
-PostgreSQL is included as a runtime dependency, but changing only `DATABASE_URL` is not a verified production migration. The current configuration defaults to the H2 driver and H2 Hibernate dialect. A PostgreSQL deployment needs an explicit driver/dialect/profile configuration, persistent database credentials, schema/migration validation, and a deployment test.
+For Aiven MySQL deployment, see [Aiven MySQL Deployment](docs/AIVEN-MYSQL-DEPLOYMENT.md). Enable the `mysql` Spring profile and supply its database connection variables; setting only a database URL is not sufficient.
 
 ## 4. Backend Implementation
 
