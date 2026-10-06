@@ -1,19 +1,25 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import {
   Activity,
   ArrowRight,
   Boxes,
   CalendarDays,
+  ClipboardList,
   Database,
+  FileText,
+  HardDrive,
   LogOut,
   Package,
   ShieldCheck,
+  Users,
   Wrench,
 } from 'lucide-react'
 import { clearSession, getApiBaseUrl, getSession, type AuthUser } from '@/lib/auth'
+import type { EquipmentRequest } from '@/lib/clms-api'
 
 type EquipmentItem = {
   id: number
@@ -41,9 +47,15 @@ type LabUser = {
 }
 
 const navigation = [
-  { label: 'Dashboard', href: '#overview', icon: Activity },
-  { label: 'Equipment', href: '#equipment', icon: Boxes },
-  { label: 'Transactions', href: '#activity', icon: Database },
+  { label: 'Dashboard', href: '/dashboard', icon: Activity, group: 'Manage' },
+  { label: 'Equipment', href: '/equipment', icon: Boxes, group: 'Manage' },
+  { label: 'Requests', href: '/requests', icon: ClipboardList, group: 'Manage' },
+  { label: 'Transactions', href: '/transactions', icon: Database, group: 'Manage' },
+  { label: 'Maintenance', href: '/maintenance', icon: Wrench, group: 'Operate', admin: true },
+  { label: 'Students', href: '/students', icon: Users, group: 'Operate', admin: true },
+  { label: 'Calendar', href: '/calendar', icon: CalendarDays, group: 'Operate' },
+  { label: 'Reports', href: '/reports', icon: FileText, group: 'System', admin: true },
+  { label: 'Settings', href: '/settings', icon: HardDrive, group: 'System', admin: true },
 ]
 
 const formatDate = (value: string | null) => {
@@ -59,6 +71,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [equipment, setEquipment] = useState<EquipmentItem[]>([])
   const [transactions, setTransactions] = useState<LoanTransaction[]>([])
+  const [requests, setRequests] = useState<EquipmentRequest[]>([])
   const [labUsers, setLabUsers] = useState<LabUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -77,6 +90,7 @@ export default function DashboardPage() {
     const dataRequests = [
       fetch(`${apiBaseUrl}/api/equipment`, { headers, signal: controller.signal }),
       fetch(`${apiBaseUrl}/api/transactions`, { headers, signal: controller.signal }),
+      fetch(`${apiBaseUrl}/api/requests`, { headers, signal: controller.signal }),
     ]
     if (session.user.role === 'ADMIN') {
       dataRequests.push(fetch(`${apiBaseUrl}/api/users`, { headers, signal: controller.signal }))
@@ -93,9 +107,11 @@ export default function DashboardPage() {
         }
         const equipmentData = await responses[0].json() as EquipmentItem[]
         const transactionData = await responses[1].json() as LoanTransaction[]
-        const usersData = responses[2] ? await responses[2].json() as LabUser[] : []
+        const requestsData = await responses[2].json() as EquipmentRequest[]
+        const usersData = responses[3] ? await responses[3].json() as LabUser[] : []
         setEquipment(equipmentData)
         setTransactions(transactionData)
+        setRequests(requestsData)
         setLabUsers(usersData ?? [])
       })
       .catch((error: unknown) => {
@@ -116,17 +132,22 @@ export default function DashboardPage() {
   const overdueLoans = activeLoans.filter((transaction) => transaction.dueAt && new Date(transaction.dueAt).getTime() < Date.now())
   const availableEquipment = equipment.filter((item) => item.status === 'AVAILABLE')
   const maintenanceEquipment = equipment.filter((item) => item.status === 'MAINTENANCE')
+  const pendingRequests = requests.filter((request) => request.status === 'PENDING')
   const recentTransactions = [...visibleTransactions]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 6)
+  const recentRequests = [...requests]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 4)
   const equipmentById = new Map(equipment.map((item) => [item.id, item]))
   const userById = new Map(labUsers.map((item) => [item.id, item]))
   const availabilityRate = equipment.length ? Math.round((availableEquipment.length / equipment.length) * 100) : 0
-  const attentionCount = maintenanceEquipment.length + overdueLoans.length
+  const attentionCount = maintenanceEquipment.length + overdueLoans.length + pendingRequests.length
   const nextSteps = isAdmin
     ? [
         { title: 'Review equipment in maintenance', detail: `${maintenanceEquipment.length} item${maintenanceEquipment.length === 1 ? '' : 's'} currently unavailable`, href: '#equipment', action: 'VIEW INVENTORY' },
         { title: 'Review active loans', detail: `${activeLoans.length} active · ${overdueLoans.length} overdue`, href: '#activity', action: 'OPEN TRANSACTIONS' },
+        { title: 'Review equipment requests', detail: `${pendingRequests.length} awaiting a decision`, href: '/requests', action: 'OPEN REQUESTS' },
         { title: 'Check available equipment', detail: `${availableEquipment.length} item${availableEquipment.length === 1 ? '' : 's'} ready to issue`, href: '#equipment', action: 'BROWSE CATALOGUE' },
       ]
     : [
@@ -138,13 +159,13 @@ export default function DashboardPage() {
     ? [
         { label: 'Total equipment', value: equipment.length, detail: 'In the inventory', icon: Package },
         { label: 'Active loans', value: activeLoans.length, detail: 'Not yet returned', icon: Database },
+        { label: 'Pending requests', value: pendingRequests.length, detail: 'Awaiting review', icon: ClipboardList },
         { label: 'Maintenance', value: maintenanceEquipment.length, detail: 'Currently unavailable', icon: Wrench },
-        { label: 'Members', value: labUsers.filter((item) => item.role === 'MEMBER').length, detail: 'Registered lab accounts', icon: Activity },
       ]
     : [
         { label: 'Available equipment', value: availableEquipment.length, detail: 'In the lab catalogue', icon: Package },
         { label: 'My active loans', value: activeLoans.length, detail: 'Assigned to your account', icon: Database },
-        { label: 'My transactions', value: myTransactions.length, detail: 'Recorded activity', icon: Activity },
+        { label: 'My requests', value: requests.length, detail: 'Request history', icon: ClipboardList },
         { label: 'Overdue', value: overdueLoans.length, detail: 'Please return or contact staff', icon: CalendarDays },
       ]
 
@@ -165,19 +186,16 @@ export default function DashboardPage() {
             <div className="font-mono text-[9px] uppercase tracking-[0.26em] text-[#9a80ff]">CLMS / 26</div>
             <div className="mt-1 text-sm font-medium tracking-tight">LAB / CONTROL</div>
           </a>
-          <div className="mb-2 px-2 font-mono text-[8px] uppercase tracking-[0.24em] text-[#777780]">Manage</div>
-          <nav aria-label="Dashboard sections" className="space-y-1">
-            {navigation.map(({ label, href, icon: Icon }, index) => (
-              <a
-                key={label}
-                href={href}
-                aria-current={index === 0 ? 'page' : undefined}
-                className={`flex min-h-8 items-center gap-2 border px-2 text-[11px] transition ${index === 0 ? 'border-white/10 bg-white/[0.07] text-white' : 'border-transparent text-[#aaaab2] hover:bg-white/[0.04] hover:text-white'}`}
-              >
-                <Icon className="h-3 w-3 text-[#9a80ff]" />
-                {label === 'Transactions' && !isAdmin ? 'My activity' : label}
-              </a>
-            ))}
+          <nav aria-label="Dashboard sections" className="space-y-4">
+            {['Manage', 'Operate', 'System'].map((group) => {
+              const items = navigation.filter((item) => item.group === group && (!item.admin || isAdmin))
+              if (!items.length) return null
+              return <div key={group}><div className="mb-2 px-2 font-mono text-[8px] uppercase tracking-[0.24em] text-[#777780]">{group}</div><div className="space-y-1">{items.map(({ label, href, icon: Icon }) => (
+                <Link key={label} href={href} aria-current={label === 'Dashboard' ? 'page' : undefined} className={`flex min-h-8 items-center gap-2 border px-2 text-[11px] transition ${label === 'Dashboard' ? 'border-white/10 bg-white/[0.07] text-white' : 'border-transparent text-[#aaaab2] hover:bg-white/[0.04] hover:text-white'}`}>
+                  <Icon className="h-3 w-3 text-[#9a80ff]" />{label === 'Transactions' && !isAdmin ? 'My activity' : label}
+                </Link>
+              ))}</div></div>
+            })}
           </nav>
           <div className="mt-8 px-2 font-mono text-[8px] uppercase tracking-[0.24em] text-[#777780]">{isAdmin ? 'Operations' : 'Account'}</div>
           <div className="mt-2 px-2 text-[10px] leading-4 text-[#9a9aa3]">
@@ -220,8 +238,8 @@ export default function DashboardPage() {
           </header>
 
           <nav aria-label="Dashboard sections" className="flex gap-2 overflow-x-auto border-b border-white/10 bg-[#141416] px-4 py-2 lg:hidden">
-            {navigation.map(({ label, href }) => (
-              <a key={label} href={href} className="shrink-0 border border-white/10 px-3 py-1.5 text-[10px] text-[#c6c6cd]">{label === 'Transactions' && !isAdmin ? 'My activity' : label}</a>
+            {navigation.filter((item) => !item.admin || isAdmin).map(({ label, href }) => (
+              <Link key={label} href={href} className={`shrink-0 border px-3 py-1.5 text-[10px] ${label === 'Dashboard' ? 'border-[#9a80ff]/50 bg-[#9a80ff]/10 text-white' : 'border-white/10 text-[#c6c6cd]'}`}>{label === 'Transactions' && !isAdmin ? 'My activity' : label}</Link>
             ))}
           </nav>
 
@@ -307,7 +325,7 @@ export default function DashboardPage() {
               ))}
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2">
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div id="equipment" className="scroll-mt-4 border border-white/10 bg-[#1b1b1d] p-4">
                 <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
                   <div>
@@ -344,6 +362,21 @@ export default function DashboardPage() {
                     return <div key={transaction.id} className="flex items-center justify-between gap-3 border-b border-white/[0.07] py-2 last:border-0"><div className="min-w-0"><div className="truncate text-[10px]">{item?.name ?? `Equipment #${transaction.equipmentId}`}</div><div className="mt-1 truncate text-[8px] text-[#777780]">{isAdmin ? `${memberName} · ` : ''}{transaction.action.replaceAll('_', ' ')}</div></div><span className={`shrink-0 text-right font-mono text-[7px] uppercase tracking-[0.08em] ${overdue ? 'text-amber-300' : transaction.returnedAt ? 'text-emerald-300' : 'text-[#b49eff]'}`}>{overdue ? 'Overdue' : `${dateLabel} ${formatDate(transaction.returnedAt ?? transaction.dueAt ?? transaction.createdAt)}`}</span></div>
                   })}
                   {!isLoading && !loadError && recentTransactions.length === 0 ? <p className="py-5 text-center text-[9px] text-[#777780]">{isAdmin ? 'No transactions have been recorded.' : 'No transactions are recorded for your account yet.'}</p> : null}
+                </div>
+              </div>
+
+              <div id="requests" className="scroll-mt-4 border border-white/10 bg-[#1b1b1d] p-4">
+                <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                  <div><div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">{isAdmin ? 'Requests' : 'My requests'}</div><h2 className="mt-1 text-[11px]">{isLoading ? 'Loading requests…' : `${pendingRequests.length} awaiting review`}</h2></div>
+                  <Link href="/requests" className="font-mono text-[7px] uppercase tracking-[0.1em] text-[#b49eff]">Open queue</Link>
+                </div>
+                <div className="space-y-2">
+                  {recentRequests.map((request) => {
+                    const item = equipmentById.get(request.equipmentId)
+                    const requester = userById.get(request.userId)?.name ?? `Member #${request.userId}`
+                    return <div key={request.id} className="flex items-center justify-between gap-2 border-b border-white/[0.07] py-2 last:border-0"><div className="min-w-0"><div className="truncate text-[9px] font-medium">{isAdmin ? requester : item?.name ?? `Equipment #${request.equipmentId}`}</div><div className="mt-1 truncate text-[8px] text-[#777780]">{isAdmin ? item?.name ?? `Equipment #${request.equipmentId}` : request.purpose}</div></div><span className={`shrink-0 font-mono text-[7px] uppercase ${request.status === 'PENDING' ? 'text-[#b49eff]' : request.status === 'APPROVED' ? 'text-emerald-300' : 'text-red-300'}`}>{request.status}</span></div>
+                  })}
+                  {!isLoading && !loadError && recentRequests.length === 0 ? <p className="py-5 text-center text-[9px] text-[#777780]">No request records yet.</p> : null}
                 </div>
               </div>
             </section>

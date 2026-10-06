@@ -10,10 +10,17 @@ CREATE TABLE IF NOT EXISTS transactions (
   id BIGSERIAL PRIMARY KEY, equipment_id BIGINT NOT NULL REFERENCES equipment(id), user_id BIGINT NOT NULL REFERENCES users(id),
   action VARCHAR(30) NOT NULL, due_at TIMESTAMP WITH TIME ZONE, returned_at TIMESTAMP WITH TIME ZONE, notes TEXT, created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS equipment_requests (
+  id BIGSERIAL PRIMARY KEY, equipment_id BIGINT NOT NULL REFERENCES equipment(id), user_id BIGINT NOT NULL REFERENCES users(id),
+  purpose VARCHAR(500) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'PENDING', due_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP, reviewed_at TIMESTAMP WITH TIME ZONE
+);
 CREATE TABLE IF NOT EXISTS logs (
   id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id), action VARCHAR(120) NOT NULL, entity_type VARCHAR(80) NOT NULL,
   entity_id BIGINT, details TEXT, created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment(status);
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_requests_user ON equipment_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_equipment_requests_status ON equipment_requests(status);
 CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at DESC);

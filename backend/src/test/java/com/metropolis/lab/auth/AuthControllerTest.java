@@ -1,11 +1,13 @@
 package com.metropolis.lab.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.metropolis.lab.user.User;
 import com.metropolis.lab.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -14,6 +16,8 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -34,8 +38,12 @@ class AuthControllerTest {
   @Autowired
   private ObjectMapper objectMapper;
 
+  @Autowired
+  private AuthTokenService authTokenService;
+
   @BeforeEach
   void setUp() {
+    jdbcTemplate.update("DELETE FROM equipment_requests");
     jdbcTemplate.update("DELETE FROM transactions");
     jdbcTemplate.update("DELETE FROM equipment");
     userRepository.deleteAll();
@@ -152,6 +160,49 @@ class AuthControllerTest {
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.length()").value(1))
       .andExpect(jsonPath("$[0].userId").value(memberId));
+  }
+
+  @Test
+  void requestApprovalCreatesLoanAndMemberCanReturnIt() throws Exception {
+    String memberToken = registerMember("Loan Member", "loan@example.edu");
+    Long memberId = userRepository.findByEmailIgnoreCase("loan@example.edu").orElseThrow().getId();
+
+    User admin = new User();
+    admin.setName("Lab Admin");
+    admin.setEmail("workflow-admin@example.edu");
+    admin.setPasswordHash(new BCryptPasswordEncoder().encode("Password123"));
+    admin.setRole("ADMIN");
+    admin = userRepository.save(admin);
+    String adminToken = authTokenService.issue(admin);
+
+    jdbcTemplate.update(
+      "INSERT INTO equipment (name, category, asset_tag, status, location) VALUES (?, ?, ?, ?, ?)",
+      "Workflow Scope", "Test", "WORKFLOW-1", "AVAILABLE", "Lab"
+    );
+    Long equipmentId = jdbcTemplate.queryForObject("SELECT id FROM equipment WHERE asset_tag = ?", Long.class, "WORKFLOW-1");
+    String requestBody = objectMapper.writeValueAsString(java.util.Map.of("equipmentId", equipmentId, "purpose", "Research session"));
+    String requestResponse = mockMvc.perform(post("/api/requests")
+        .header("Authorization", "Bearer " + memberToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(requestBody))
+      .andExpect(status().isCreated())
+      .andReturn().getResponse().getContentAsString();
+    Long requestId = objectMapper.readTree(requestResponse).get("id").asLong();
+
+    mockMvc.perform(patch("/api/requests/{id}/decision", requestId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"status\":\"APPROVED\"}"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.status").value("APPROVED"));
+    Long transactionId = jdbcTemplate.queryForObject("SELECT id FROM transactions WHERE user_id = ?", Long.class, memberId);
+    org.junit.jupiter.api.Assertions.assertEquals("IN_USE", jdbcTemplate.queryForObject("SELECT status FROM equipment WHERE id = ?", String.class, equipmentId));
+
+    mockMvc.perform(put("/api/transactions/{id}/return", transactionId)
+        .header("Authorization", "Bearer " + memberToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.action").value("RETURN"));
+    org.junit.jupiter.api.Assertions.assertEquals("AVAILABLE", jdbcTemplate.queryForObject("SELECT status FROM equipment WHERE id = ?", String.class, equipmentId));
   }
 
   private String registerMember(String name, String email) throws Exception {

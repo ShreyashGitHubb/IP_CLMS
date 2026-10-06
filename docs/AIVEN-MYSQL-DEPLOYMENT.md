@@ -98,12 +98,13 @@ The controllers use this origin for CORS. If you have multiple frontend domains 
 
 1. Confirm the backend `/api/health` endpoint returns HTTP `200`.
 2. From the deployed frontend, register a test member account and sign in.
-3. Use an API client or frontend flow to create a test equipment row with `POST /api/equipment`.
-4. Read it back with `GET /api/equipment` and confirm it persists after restarting/redeploying the backend.
-5. Create and read a transaction using existing user and equipment IDs.
-6. Check the Aiven service metrics/logs for successful client connections.
-7. Confirm an unauthenticated request to `/api/equipment` is rejected, and that a member token cannot list users or create equipment.
-8. Delete any test records and accounts that should not remain.
+4. Use an administrator account to create a test equipment row with `POST /api/equipment`, then read it back with `GET /api/equipment`.
+5. Sign in as a member, submit an equipment request in the frontend, and verify it appears in that member's request history.
+6. Sign in as an administrator, approve the request, and confirm it creates a loan and marks the equipment in use.
+7. Return the loan and confirm the transaction closes and equipment becomes available again; verify the records persist after a backend restart/redeploy.
+8. Check the Aiven service metrics/logs for successful client connections.
+9. Confirm unauthenticated API requests are rejected and member tokens cannot list users, decide requests, or modify equipment.
+10. Delete any test records and accounts that should not remain.
 
 The dashboard loads equipment and transaction records through the backend API. Member transaction reads are scoped to the authenticated member; equipment writes, user listing, and transaction creation require an administrator. Request approval, maintenance tracking, reports, calendar scheduling, and audit-event writing are not implemented as backend workflows.
 

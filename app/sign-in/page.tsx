@@ -63,18 +63,15 @@ export default function SignInPage() {
                     <div className="text-xl font-semibold">Lab Control</div>
                   </div>
                 </div>
-                <h1 className="max-w-sm text-4xl font-semibold tracking-[-0.06em]">Modern lab operations, built for real work.</h1>
+                <h1 className="max-w-sm text-4xl font-semibold tracking-[-0.06em]">Equipment, loans, and lab access.</h1>
                 <p className="mt-4 max-w-sm text-sm leading-6 text-[#b3b3bc]">
-                  Track inventory, approve requests, coordinate maintenance, and keep the lab running smoothly from one dashboard.
+                  Sign in to view live laboratory inventory and the requests or transactions linked to your account.
                 </p>
               </div>
 
-              <div className="relative rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#b7aefc]">Demo access</div>
-                <div className="mt-3 space-y-2 text-sm leading-6 text-[#dfe3ef]">
-                  <div><span className="font-medium text-white">Admin:</span> admin@clms.local / Admin@123</div>
-                  <div><span className="font-medium text-white">Member:</span> member@clms.local / Member@123</div>
-                </div>
+              <div className="relative border border-white/10 bg-white/[0.04] p-5">
+                <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#b7aefc]">Account access</div>
+                <p className="mt-3 text-xs leading-5 text-[#c3c3cb]">Use your registered account. Administrator access is provisioned by the laboratory administrator.</p>
               </div>
             </div>
 
