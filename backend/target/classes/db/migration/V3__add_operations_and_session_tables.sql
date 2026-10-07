@@ -10,7 +10,17 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
   CONSTRAINT fk_auth_sessions_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
+SET @add_password_column = IF(
+  (SELECT COUNT(*) FROM information_schema.columns
+   WHERE table_schema = DATABASE()
+     AND table_name = 'users'
+     AND column_name = 'must_change_password') = 0,
+  'ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE',
+  'SELECT 1'
+);
+PREPARE add_password_column_stmt FROM @add_password_column;
+EXECUTE add_password_column_stmt;
+DEALLOCATE PREPARE add_password_column_stmt;
 
 CREATE TABLE IF NOT EXISTS maintenance_tickets (
   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
