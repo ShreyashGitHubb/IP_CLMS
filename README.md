@@ -397,27 +397,26 @@ The backend test suite includes context startup, authentication, role restrictio
 
 ### Implemented
 
-- Signed bearer-token login with 12-hour expiry, member-only registration, and administrator seeding.
+- Signed bearer-token login with database-backed 12-hour sessions, current-session logout, revoke-all, member-only registration, and administrator seeding.
 - Authenticated equipment list/detail and administrator create/update/delete operations.
-- Admin-only user listing; member transaction and request reads are scoped to the authenticated account.
+- Admin-only account creation, role changes, temporary password reset, and user listing; sensitive changes revoke existing sessions.
+- Member transaction/request reads are scoped to the authenticated account; members can cancel pending requests.
 - Equipment request creation, administrator approval/rejection, approval-to-loan conversion, and equipment return.
-- Maintenance status updates through equipment records.
-- Landing, sign-in, sign-up, dashboard, equipment, requests, transactions, maintenance, students, calendar, reports, and settings screens.
-- Calendar and reports derived from actual equipment and transaction records; the workspace dashboard shows live API data.
+- Maintenance tickets track technician assignment, status, repair cost, and resolution history while updating equipment availability.
+- Scheduled lab events, per-user in-app notifications, and audit records for successful authenticated mutations.
+- Landing, sign-in, sign-up, dashboard, equipment, requests, transactions, maintenance, students, calendar, reports, notifications, audit, and settings screens.
+- Calendar and date-filtered CSV reports derive from actual event, equipment, and transaction records; the workspace dashboard shows live API data.
 - H2 schema for local development and Flyway-managed MySQL schema for deployment.
 
 ### Not yet implemented or not verified for production
 
-- Admins cannot create/invite users or change roles through the authenticated UI/API; public sign-up creates members only, and admin provisioning uses the seed configuration.
-- Members can request and view their requests but cannot cancel a pending request.
-- Maintenance only changes an equipment status. There is no repair ticket, technician assignment, cost, parts, or maintenance history.
-- Calendar entries are loan due dates only. Lab events and scheduling are not supported.
-- Reports show current derived metrics, not configurable date-range exports or historical trend snapshots.
-- The `logs` table/entity is not populated; audit history and notification delivery are not implemented.
-- Password reset, email verification, invitation emails, token refresh/revocation, and HttpOnly-cookie sessions are not implemented. Browser sessions use local storage.
-- A stable `AUTH_TOKEN_SECRET` must be configured in Render and shared by all backend instances. Without it the fallback key is ephemeral and invalidates sessions on restart.
+- Email-based password recovery, email verification, invitation delivery, and outbound email notifications require a mail provider and secrets, which are not configured. Admins can issue one-time temporary passwords in-app.
+- Notifications are in-app only; web push, email, and SMS delivery are not configured.
+- Audit records cover successful authenticated mutations; they do not store before/after field diffs or read-only access events.
+- Reports support selected date-range transaction aggregates and CSV, but do not retain historical snapshots.
+- Browser sessions use local storage; a stable `AUTH_TOKEN_SECRET` is required in Render for sessions to survive restarts and work across instances.
 - H2 is in-memory and loses data when the backend stops; production persistence requires the configured MySQL profile and successful Flyway migration.
-- Automated tests have been added for core flows, but the current deployed Render, Aiven, and Vercel integration has not been confirmed by those tests.
+- The app has not been run under a full Maven/Next build-and-test pass in this environment, so the remaining deployment verification is still pending.
 
 ## 10. Repository Layout
 

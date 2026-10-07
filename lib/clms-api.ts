@@ -64,7 +64,7 @@ export type EquipmentRequest = {
   equipmentId: number
   userId: number
   purpose: string
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
   dueAt: string | null
   createdAt: string
   reviewedAt: string | null
@@ -75,6 +75,38 @@ export type LabUser = {
   name: string
   email: string
   role: string
+  createdAt: string
+}
+
+export type MaintenanceTicket = {
+  id: number
+  equipmentId: number
+  openedBy: number
+  assignedTechnician: string | null
+  title: string
+  details: string
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'
+  repairCost: number | null
+  openedAt: string
+  resolvedAt: string | null
+}
+
+export type LabEvent = {
+  id: number
+  createdBy: number
+  title: string
+  details: string | null
+  startsAt: string
+  endsAt: string | null
+  createdAt: string
+}
+
+export type NotificationItem = {
+  id: number
+  userId: number
+  title: string
+  message: string
+  readAt: string | null
   createdAt: string
 }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, X } from 'lucide-react'
+import { Check, X, Ban } from 'lucide-react'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, formatDate, type EquipmentItem, type EquipmentRequest, type LabUser } from '@/lib/clms-api'
 import { getSession } from '@/lib/auth'
@@ -43,6 +43,16 @@ export default function RequestsPage() {
     }
   }
 
+  const cancel = async (request: EquipmentRequest) => {
+    setError('')
+    try {
+      await apiRequest<void>(`/api/requests/${request.id}`, { method: 'DELETE' })
+      setRevision((value) => value + 1)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not cancel request.')
+    }
+  }
+
   const itemById = new Map(equipment.map((item) => [item.id, item]))
   const userById = new Map(users.map((user) => [user.id, user]))
   const pending = requests.filter((request) => request.status === 'PENDING').length
@@ -58,7 +68,7 @@ export default function RequestsPage() {
         const requester = userById.get(request.userId)
         return <article key={request.id} className="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.08] px-3.5 py-3 last:border-0 sm:px-4">
           <div className="flex min-w-0 items-start gap-3"><div className="flex h-7 w-7 shrink-0 items-center justify-center bg-[#29243a] font-mono text-[8px] text-[#cbbcff]">{requester?.name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase() ?? 'RQ'}</div><div className="min-w-0"><div className="truncate text-[10px] font-medium">{isAdmin ? requester?.name ?? `Member #${request.userId}` : item?.name ?? `Equipment #${request.equipmentId}`}</div><div className="mt-1 truncate text-[9px] text-[#a0a0a8]">{isAdmin ? `Requested ${item?.name ?? `equipment #${request.equipmentId}`}` : request.purpose}</div><div className="mt-1 truncate text-[8px] text-[#777780]">{isAdmin ? request.purpose : `Requested ${formatDate(request.createdAt)}`}</div></div></div>
-          <div className="flex items-center gap-3"><div className="text-right"><div className="font-mono text-[7px] uppercase text-[#777780]">Due</div><div className="mt-1 text-[9px] text-[#c6c6cc]">{formatDate(request.dueAt)}</div></div><span className={`font-mono text-[7px] uppercase tracking-[0.1em] ${request.status === 'APPROVED' ? 'text-emerald-300' : request.status === 'REJECTED' ? 'text-red-300' : 'text-[#b49eff]'}`}>● {request.status}</span>{isAdmin && request.status === 'PENDING' ? <div className="flex gap-1"><button onClick={() => decide(request, 'APPROVED')} title="Approve request" aria-label="Approve request" className="flex h-7 w-7 items-center justify-center bg-[#8e73ff] text-white hover:bg-[#a18cff]"><Check className="h-3.5 w-3.5" /></button><button onClick={() => decide(request, 'REJECTED')} title="Reject request" aria-label="Reject request" className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#aaa] hover:text-red-300"><X className="h-3.5 w-3.5" /></button></div> : null}</div>
+          <div className="flex items-center gap-3"><div className="text-right"><div className="font-mono text-[7px] uppercase text-[#777780]">Due</div><div className="mt-1 text-[9px] text-[#c6c6cc]">{formatDate(request.dueAt)}</div></div><span className={`font-mono text-[7px] uppercase tracking-[0.1em] ${request.status === 'APPROVED' ? 'text-emerald-300' : request.status === 'REJECTED' ? 'text-red-300' : request.status === 'CANCELLED' ? 'text-[#888]' : 'text-[#b49eff]'}`}>● {request.status}</span>{isAdmin && request.status === 'PENDING' ? <div className="flex gap-1"><button onClick={() => decide(request, 'APPROVED')} title="Approve request" aria-label="Approve request" className="flex h-7 w-7 items-center justify-center bg-[#8e73ff] text-white hover:bg-[#a18cff]"><Check className="h-3.5 w-3.5" /></button><button onClick={() => decide(request, 'REJECTED')} title="Reject request" aria-label="Reject request" className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#aaa] hover:text-red-300"><X className="h-3.5 w-3.5" /></button></div> : !isAdmin && request.status === 'PENDING' ? <button onClick={() => cancel(request)} title="Cancel request" aria-label="Cancel request" className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#aaa] hover:text-red-300"><Ban className="h-3.5 w-3.5" /></button> : null}</div>
         </article>
       })}
     </div>

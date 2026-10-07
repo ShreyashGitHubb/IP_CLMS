@@ -6,6 +6,7 @@ import com.metropolis.lab.equipment.EquipmentStatus;
 import com.metropolis.lab.transaction.Transaction;
 import com.metropolis.lab.transaction.TransactionRepository;
 import com.metropolis.lab.user.User;
+import com.metropolis.lab.notification.NotificationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -23,11 +24,13 @@ public class EquipmentRequestController {
   private final EquipmentRequestRepository requests;
   private final EquipmentRepository equipment;
   private final TransactionRepository transactions;
+  private final NotificationService notifications;
 
-  public EquipmentRequestController(EquipmentRequestRepository requests, EquipmentRepository equipment, TransactionRepository transactions) {
+  public EquipmentRequestController(EquipmentRequestRepository requests, EquipmentRepository equipment, TransactionRepository transactions, NotificationService notifications) {
     this.requests = requests;
     this.equipment = equipment;
     this.transactions = transactions;
+    this.notifications = notifications;
   }
 
   @GetMapping
@@ -42,12 +45,30 @@ public class EquipmentRequestController {
     if (item.getStatus() != EquipmentStatus.AVAILABLE) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "This equipment is not currently available.");
     }
+    if (requests.existsByUserIdAndEquipmentIdAndStatus(user.getId(), item.getId(), "PENDING")) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "You already have a pending request for this equipment.");
+    }
     EquipmentRequest request = new EquipmentRequest();
     request.setEquipmentId(item.getId());
     request.setUserId(user.getId());
     request.setPurpose(body.purpose().trim());
     request.setDueAt(body.dueAt());
     return requests.save(request);
+  }
+
+  @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void cancel(@PathVariable Long id, @RequestAttribute("currentUser") User user) {
+    EquipmentRequest request = requests.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found."));
+    if (!request.getUserId().equals(user.getId()) && !isAdmin(user)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only cancel your own request.");
+    }
+    if (!"PENDING".equals(request.getStatus())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending requests can be cancelled.");
+    }
+    request.setStatus("CANCELLED");
+    request.setReviewedAt(Instant.now());
+    requests.save(request);
   }
 
   @PatchMapping("/{id}/decision")
@@ -75,7 +96,10 @@ public class EquipmentRequestController {
     }
     request.setStatus(decision.status());
     request.setReviewedAt(Instant.now());
-    return requests.save(request);
+    EquipmentRequest saved = requests.save(request);
+    notifications.create(request.getUserId(), "Equipment request " + decision.status().toLowerCase(),
+      "Your request for " + ("APPROVED".equals(decision.status()) ? "equipment was approved and issued." : "equipment was rejected."));
+    return saved;
   }
 
   private boolean isAdmin(User user) { return "ADMIN".equals(user.getRole()); }

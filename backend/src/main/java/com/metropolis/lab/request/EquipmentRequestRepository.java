@@ -6,4 +6,5 @@ import java.util.List;
 public interface EquipmentRequestRepository extends JpaRepository<EquipmentRequest, Long> {
   List<EquipmentRequest> findAllByUserIdOrderByCreatedAtDesc(Long userId);
   List<EquipmentRequest> findAllByOrderByCreatedAtDesc();
+  boolean existsByUserIdAndEquipmentIdAndStatus(Long userId, Long equipmentId, String status);
 }

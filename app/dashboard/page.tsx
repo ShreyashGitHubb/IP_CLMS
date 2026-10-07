@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import {
   Activity,
   ArrowRight,
+  Bell,
   Boxes,
   CalendarDays,
   ClipboardList,
@@ -18,7 +19,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react'
-import { clearSession, getApiBaseUrl, getSession, type AuthUser } from '@/lib/auth'
+import { getApiBaseUrl, getSession, logoutSession, type AuthUser } from '@/lib/auth'
 import type { EquipmentRequest } from '@/lib/clms-api'
 
 type EquipmentItem = {
@@ -51,10 +52,12 @@ const navigation = [
   { label: 'Equipment', href: '/equipment', icon: Boxes, group: 'Manage' },
   { label: 'Requests', href: '/requests', icon: ClipboardList, group: 'Manage' },
   { label: 'Transactions', href: '/transactions', icon: Database, group: 'Manage' },
+  { label: 'Notifications', href: '/notifications', icon: Bell, group: 'Manage' },
   { label: 'Maintenance', href: '/maintenance', icon: Wrench, group: 'Operate', admin: true },
   { label: 'Students', href: '/students', icon: Users, group: 'Operate', admin: true },
   { label: 'Calendar', href: '/calendar', icon: CalendarDays, group: 'Operate' },
   { label: 'Reports', href: '/reports', icon: FileText, group: 'System', admin: true },
+  { label: 'Audit log', href: '/audit', icon: ShieldCheck, group: 'System', admin: true },
   { label: 'Settings', href: '/settings', icon: HardDrive, group: 'System', admin: true },
 ]
 
@@ -169,8 +172,8 @@ export default function DashboardPage() {
         { label: 'Overdue', value: overdueLoans.length, detail: 'Please return or contact staff', icon: CalendarDays },
       ]
 
-  const handleLogout = () => {
-    clearSession()
+  const handleLogout = async () => {
+    await logoutSession()
     router.push('/sign-in')
   }
 

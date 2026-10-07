@@ -1,16 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.metropolis.lab.auth.AuthControllerTest
 -------------------------------------------------------------------------------
-Tests run: 3, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 3.799 s <<< FAILURE! -- in com.metropolis.lab.auth.AuthControllerTest
-com.metropolis.lab.auth.AuthControllerTest.operationalEndpointsRequireAuthenticationAndRestrictAdminActions -- Time elapsed: 0.401 s <<< ERROR!
-java.lang.Error: 
-Unresolved compilation problems: 
-	Syntax error on tokens, delete these tokens
-	TEST cannot be resolved to a variable
-	Syntax error on tokens, delete these tokens
-
-	at com.metropolis.lab.auth.AuthControllerTest.operationalEndpointsRequireAuthenticationAndRestrictAdminActions(AuthControllerTest.java:114)
-	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
-	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
-	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
-
+Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.858 s -- in com.metropolis.lab.auth.AuthControllerTest

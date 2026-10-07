@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id BIGSERIAL PRIMARY KEY, name VARCHAR(120) NOT NULL, email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL, role VARCHAR(30) NOT NULL DEFAULT 'MEMBER', created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+  password_hash VARCHAR(255) NOT NULL, role VARCHAR(30) NOT NULL DEFAULT 'MEMBER', must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS equipment (
   id BIGSERIAL PRIMARY KEY, name VARCHAR(160) NOT NULL, category VARCHAR(80) NOT NULL, asset_tag VARCHAR(80) UNIQUE NOT NULL,
@@ -19,8 +20,30 @@ CREATE TABLE IF NOT EXISTS logs (
   id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id), action VARCHAR(120) NOT NULL, entity_type VARCHAR(80) NOT NULL,
   entity_id BIGINT, details TEXT, created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  id BIGSERIAL PRIMARY KEY, session_id VARCHAR(36) NOT NULL UNIQUE, user_id BIGINT NOT NULL REFERENCES users(id),
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL, revoked_at TIMESTAMP WITH TIME ZONE, created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS maintenance_tickets (
+  id BIGSERIAL PRIMARY KEY, equipment_id BIGINT NOT NULL REFERENCES equipment(id), opened_by BIGINT NOT NULL REFERENCES users(id),
+  assigned_technician VARCHAR(120), title VARCHAR(160) NOT NULL, details TEXT NOT NULL, status VARCHAR(24) NOT NULL DEFAULT 'OPEN',
+  repair_cost DECIMAL(12,2), opened_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP, resolved_at TIMESTAMP WITH TIME ZONE
+);
+CREATE TABLE IF NOT EXISTS lab_events (
+  id BIGSERIAL PRIMARY KEY, created_by BIGINT NOT NULL REFERENCES users(id), title VARCHAR(160) NOT NULL, details TEXT,
+  starts_at TIMESTAMP WITH TIME ZONE NOT NULL, ends_at TIMESTAMP WITH TIME ZONE, created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS notifications (
+  id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id), title VARCHAR(160) NOT NULL,
+  message VARCHAR(500) NOT NULL, read_at TIMESTAMP WITH TIME ZONE, created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment(status);
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_equipment_requests_user ON equipment_requests(user_id);
 CREATE INDEX IF NOT EXISTS idx_equipment_requests_status ON equipment_requests(status);
 CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status);
+CREATE INDEX IF NOT EXISTS idx_maintenance_equipment ON maintenance_tickets(equipment_id);
+CREATE INDEX IF NOT EXISTS idx_lab_events_start ON lab_events(starts_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at);

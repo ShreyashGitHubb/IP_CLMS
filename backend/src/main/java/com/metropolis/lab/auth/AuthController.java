@@ -73,6 +73,18 @@ public class AuthController {
     return ResponseEntity.ok(authResponse(user.get()));
   }
 
+  @PostMapping("/logout")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void logout(@RequestAttribute(AuthInterceptor.CURRENT_SESSION_ATTRIBUTE) String sessionId) {
+    authTokenService.revoke(sessionId);
+  }
+
+  @PostMapping("/logout-all")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void logoutAll(@RequestAttribute("currentUser") User user) {
+    authTokenService.revokeAll(user.getId());
+  }
+
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException ex) {
     return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
@@ -102,7 +114,8 @@ public class AuthController {
         "id", user.getId(),
         "name", user.getName(),
         "email", user.getEmail(),
-        "role", user.getRole()
+        "role", user.getRole(),
+        "mustChangePassword", user.isMustChangePassword()
       )
     );
   }

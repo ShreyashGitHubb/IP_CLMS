@@ -38,7 +38,7 @@ export default function SignInPage() {
       }
 
       saveSession(payload.user, payload.token)
-      router.push('/dashboard')
+      router.push(payload.user.mustChangePassword ? '/settings?forcePasswordChange=1' : '/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to sign in right now.')
     } finally {

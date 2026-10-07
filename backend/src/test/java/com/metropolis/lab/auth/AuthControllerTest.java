@@ -44,6 +44,11 @@ class AuthControllerTest {
 
   @BeforeEach
   void setUp() {
+    jdbcTemplate.update("DELETE FROM notifications");
+    jdbcTemplate.update("DELETE FROM maintenance_tickets");
+    jdbcTemplate.update("DELETE FROM lab_events");
+    jdbcTemplate.update("DELETE FROM auth_sessions");
+    jdbcTemplate.update("DELETE FROM logs");
     jdbcTemplate.update("DELETE FROM equipment_requests");
     jdbcTemplate.update("DELETE FROM transactions");
     jdbcTemplate.update("DELETE FROM equipment");
@@ -141,6 +146,64 @@ class AuthControllerTest {
   }
 
   @Test
+  void logoutRevokesTheCurrentBearerSession() throws Exception {
+    String token = registerMember("Logout Member", "logout@example.edu");
+    mockMvc.perform(post("/api/auth/logout").header("Authorization", "Bearer " + token))
+      .andExpect(status().isNoContent());
+    mockMvc.perform(get("/api/equipment").header("Authorization", "Bearer " + token))
+      .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void adminCanCreateAccountAndPromoteMember() throws Exception {
+    User admin = createAdmin("account-admin@example.edu");
+    String adminToken = authTokenService.issue(admin);
+    String createBody = """
+      {"name":"Created Member","email":"created@example.edu","password":"Temporary123","role":"MEMBER"}
+      """;
+    String response = mockMvc.perform(post("/api/users")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(createBody))
+      .andExpect(status().isCreated())
+      .andExpect(jsonPath("$.mustChangePassword").value(true))
+      .andReturn().getResponse().getContentAsString();
+    Long memberId = objectMapper.readTree(response).get("id").asLong();
+
+    mockMvc.perform(patch("/api/users/{id}/role", memberId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"role\":\"ADMIN\"}"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.role").value("ADMIN"));
+  }
+
+  @Test
+  void memberCanCancelOnlyOwnPendingRequest() throws Exception {
+    String memberToken = registerMember("Request Member", "request-member@example.edu");
+    Long memberId = userRepository.findByEmailIgnoreCase("request-member@example.edu").orElseThrow().getId();
+    jdbcTemplate.update("INSERT INTO equipment (name, category, asset_tag, status, location) VALUES (?, ?, ?, ?, ?)", "Request Board", "Test", "REQUEST-1", "AVAILABLE", "Lab");
+    Long equipmentId = jdbcTemplate.queryForObject("SELECT id FROM equipment WHERE asset_tag = ?", Long.class, "REQUEST-1");
+    jdbcTemplate.update("INSERT INTO equipment_requests (equipment_id, user_id, purpose, status) VALUES (?, ?, ?, ?)", equipmentId, memberId, "Coursework", "PENDING");
+    Long requestId = jdbcTemplate.queryForObject("SELECT id FROM equipment_requests WHERE user_id = ?", Long.class, memberId);
+
+    mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/requests/{id}", requestId)
+        .header("Authorization", "Bearer " + memberToken))
+      .andExpect(status().isNoContent());
+    org.junit.jupiter.api.Assertions.assertEquals("CANCELLED", jdbcTemplate.queryForObject("SELECT status FROM equipment_requests WHERE id = ?", String.class, requestId));
+  }
+
+  @Test
+  void memberCannotReadAnotherUsersNotifications() throws Exception {
+    String memberToken = registerMember("Notification Member", "notify-member@example.edu");
+    Long otherMemberId = registerMemberAndGetId("Other Member", "other-notify@example.edu");
+    jdbcTemplate.update("INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)", otherMemberId, "Private", "Not yours");
+    mockMvc.perform(get("/api/notifications").header("Authorization", "Bearer " + memberToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.length()").value(0));
+  }
+
+  @Test
   void corsPreflightDoesNotRequireBearerAuthentication() throws Exception {
     mockMvc.perform(options("/api/equipment")
         .header("Origin", "https://ip-clms.vercel.app")
@@ -174,6 +237,20 @@ class AuthControllerTest {
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.length()").value(1))
       .andExpect(jsonPath("$[0].userId").value(memberId));
+  }
+
+  @Test
+  void authenticatedMutationIsRecordedInAuditLog() throws Exception {
+    User admin = createAdmin("audit-admin@example.edu");
+    String adminToken = authTokenService.issue(admin);
+    mockMvc.perform(post("/api/equipment")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"name\":\"Audit Scope\",\"category\":\"Test\",\"assetTag\":\"AUDIT-1\",\"location\":\"Lab\"}"))
+      .andExpect(status().isCreated());
+    mockMvc.perform(get("/api/audit-logs").header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$[0].action").value("POST /api/equipment"));
   }
 
   @Test
@@ -231,5 +308,19 @@ class AuthControllerTest {
       .andExpect(status().isCreated())
       .andReturn().getResponse().getContentAsString();
     return objectMapper.readTree(response).get("token").asText();
+  }
+
+  private Long registerMemberAndGetId(String name, String email) throws Exception {
+    registerMember(name, email);
+    return userRepository.findByEmailIgnoreCase(email).orElseThrow().getId();
+  }
+
+  private User createAdmin(String email) {
+    User admin = new User();
+    admin.setName("Test Admin");
+    admin.setEmail(email);
+    admin.setPasswordHash(new BCryptPasswordEncoder().encode("Password123"));
+    admin.setRole("ADMIN");
+    return userRepository.save(admin);
   }
 }

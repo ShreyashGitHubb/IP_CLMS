@@ -11,12 +11,13 @@ import {
   Database,
   FileText,
   LogOut,
+  Bell,
   Settings2,
   ShieldCheck,
   Users,
   Wrench,
 } from 'lucide-react'
-import { clearSession, getSession, type AuthUser } from '@/lib/auth'
+import { getSession, logoutSession, type AuthUser } from '@/lib/auth'
 
 const sections = [
   { group: 'Manage', items: [
@@ -24,6 +25,7 @@ const sections = [
     { label: 'Equipment', href: '/equipment', icon: Boxes },
     { label: 'Requests', href: '/requests', icon: ClipboardList },
     { label: 'Transactions', href: '/transactions', icon: Database },
+    { label: 'Notifications', href: '/notifications', icon: Bell },
   ] },
   { group: 'Operate', items: [
     { label: 'Maintenance', href: '/maintenance', icon: Wrench, admin: true },
@@ -32,7 +34,8 @@ const sections = [
   ] },
   { group: 'System', items: [
     { label: 'Reports', href: '/reports', icon: FileText, admin: true },
-    { label: 'Settings', href: '/settings', icon: Settings2, admin: true },
+    { label: 'Audit log', href: '/audit', icon: ShieldCheck, admin: true },
+    { label: 'Settings', href: '/settings', icon: Settings2 },
   ] },
 ]
 
@@ -63,8 +66,8 @@ export function WorkspaceShell({ title, eyebrow, description, children, adminOnl
     setUser(session.user)
   }, [adminOnly, router])
 
-  const logout = () => {
-    clearSession()
+  const logout = async () => {
+    await logoutSession()
     router.replace('/sign-in')
   }
 

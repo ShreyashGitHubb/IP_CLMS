@@ -13,14 +13,17 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class AuthTokenService {
   private static final String HMAC_SHA256 = "HmacSHA256";
   private static final Duration TOKEN_LIFETIME = Duration.ofHours(12);
   private final byte[] signingKey = new byte[32];
+  private final AuthSessionRepository sessions;
 
-  public AuthTokenService(@Value("${app.auth.token-secret:}") String configuredSecret) {
+  public AuthTokenService(@Value("${app.auth.token-secret:}") String configuredSecret, AuthSessionRepository sessions) {
+    this.sessions = sessions;
     if (configuredSecret == null || configuredSecret.isBlank()) {
       new SecureRandom().nextBytes(signingKey);
     } else {
@@ -33,13 +36,20 @@ public class AuthTokenService {
   }
 
   public String issue(User user) {
-    String claims = user.getId() + ":" + Instant.now().plus(TOKEN_LIFETIME).getEpochSecond();
+    Instant expiresAt = Instant.now().plus(TOKEN_LIFETIME);
+    String sessionId = UUID.randomUUID().toString();
+    AuthSession session = new AuthSession();
+    session.setSessionId(sessionId);
+    session.setUserId(user.getId());
+    session.setExpiresAt(expiresAt);
+    sessions.save(session);
+    String claims = user.getId() + ":" + expiresAt.getEpochSecond() + ":" + sessionId;
     String encodedClaims = Base64.getUrlEncoder().withoutPadding()
       .encodeToString(claims.getBytes(StandardCharsets.UTF_8));
     return encodedClaims + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(sign(encodedClaims));
   }
 
-  public Optional<Long> userId(String token) {
+  public Optional<TokenClaims> claims(String token) {
     if (token == null) return Optional.empty();
     String[] parts = token.split("\\.", -1);
     if (parts.length != 2) return Optional.empty();
@@ -49,14 +59,35 @@ public class AuthTokenService {
       if (!MessageDigest.isEqual(sign(parts[0]), suppliedSignature)) return Optional.empty();
 
       String[] claims = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8).split(":", -1);
-      if (claims.length != 2 || Long.parseLong(claims[1]) <= Instant.now().getEpochSecond()) {
+      if (claims.length != 3 || Long.parseLong(claims[1]) <= Instant.now().getEpochSecond()) {
         return Optional.empty();
       }
-      return Optional.of(Long.parseLong(claims[0]));
+      Long userId = Long.parseLong(claims[0]);
+      String sessionId = claims[2];
+      AuthSession active = sessions.findBySessionIdAndRevokedAtIsNullAndExpiresAtAfter(sessionId, Instant.now()).orElse(null);
+      if (active == null || !active.getUserId().equals(userId)) return Optional.empty();
+      return Optional.of(new TokenClaims(userId, sessionId));
     } catch (IllegalArgumentException exception) {
       return Optional.empty();
     }
   }
+
+  public void revoke(String sessionId) {
+    sessions.findBySessionIdAndRevokedAtIsNullAndExpiresAtAfter(sessionId, Instant.now())
+      .ifPresent(session -> {
+        session.setRevokedAt(Instant.now());
+        sessions.save(session);
+      });
+  }
+
+  public void revokeAll(Long userId) {
+    Instant revokedAt = Instant.now();
+    var activeSessions = sessions.findAllByUserIdAndRevokedAtIsNull(userId);
+    activeSessions.forEach(session -> session.setRevokedAt(revokedAt));
+    sessions.saveAll(activeSessions);
+  }
+
+  public record TokenClaims(Long userId, String sessionId) {}
 
   private byte[] sign(String value) {
     try {

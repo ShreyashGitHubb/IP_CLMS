@@ -6,6 +6,7 @@ export type AuthUser = {
   name: string
   email: string
   role: string
+  mustChangePassword?: boolean
 }
 
 export function saveSession(user: AuthUser, token: string) {
@@ -36,4 +37,22 @@ export function clearSession() {
 
 export function getApiBaseUrl() {
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+}
+
+export async function logoutSession() {
+  const session = getSession()
+  if (!session) {
+    clearSession()
+    return
+  }
+  try {
+    await fetch(`${getApiBaseUrl()}/api/auth/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.token}` },
+    })
+  } catch {
+    // Local logout must still complete if the API is temporarily unreachable.
+  } finally {
+    clearSession()
+  }
 }
