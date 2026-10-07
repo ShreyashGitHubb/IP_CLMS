@@ -179,7 +179,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="workspace-ui h-dvh overflow-hidden bg-[#0a0a0c] text-white">
+    <main className="h-dvh overflow-hidden bg-[#101012] text-white">
       <div className="mx-auto flex h-full max-w-[1600px] overflow-hidden">
         <aside className="hidden h-full w-40 shrink-0 overflow-y-auto border-r border-white/10 bg-[#171719] px-3 py-5 lg:flex lg:flex-col">
           <a href="#overview" className="mb-9 px-2">

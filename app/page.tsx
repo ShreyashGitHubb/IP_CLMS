@@ -181,7 +181,6 @@ export default function LandingPage() {
                 Open app
                 <ArrowRight className="h-4 w-4" />
               </Link>
-            </div>
           </div>
         </section>
       </div>
