@@ -391,33 +391,33 @@ Name the final PDF using the group name as required by the instructor (for examp
 
 ### Existing automated test coverage
 
-The backend test suite currently contains a Spring application-context startup test. It checks that the application can initialize with the configured local database; it is not a full suite of endpoint, database CRUD, authentication, or transaction workflow tests. The frontend production build checks that the Next.js app compiles and routes can be generated.
+The backend test suite includes context startup, authentication, role restrictions, request approval, loan creation, and return-flow coverage. This does not replace verification against the deployed Render/Aiven/Vercel environment.
 
 ## 9. Current Scope and Limitations
 
 ### Implemented
 
-- Spring Boot API and schema initialization.
-- Equipment CRUD endpoints.
-- User listing endpoint.
-- Transaction list and create endpoints.
-- Authentication register/login endpoints with BCrypt password hashing.
-- Member-only public registration and optional configurable administrator seeding.
-- Next.js landing, sign-in, sign-up, and dashboard routes.
-- H2 local database setup and a backend context-load test.
+- Signed bearer-token login with 12-hour expiry, member-only registration, and administrator seeding.
+- Authenticated equipment list/detail and administrator create/update/delete operations.
+- Admin-only user listing; member transaction and request reads are scoped to the authenticated account.
+- Equipment request creation, administrator approval/rejection, approval-to-loan conversion, and equipment return.
+- Maintenance status updates through equipment records.
+- Landing, sign-in, sign-up, dashboard, equipment, requests, transactions, maintenance, students, calendar, reports, and settings screens.
+- Calendar and reports derived from actual equipment and transaction records; the workspace dashboard shows live API data.
+- H2 schema for local development and Flyway-managed MySQL schema for deployment.
 
 ### Not yet implemented or not verified for production
 
-- Requests and loan returns are database-backed. Maintenance is represented by equipment status; the system has no separate repair/incident history.
-- Reports and the calendar are derived from current equipment and loan records. Dedicated scheduled events, notifications, and audit-log write workflows are not implemented.
-- The logs table/entity exists, but no service currently writes audit events and no log endpoint is exposed.
-- Signed bearer tokens expire after 12 hours. A deployed backend must configure the same strong `AUTH_TOKEN_SECRET` across instances and restarts.
-- Browser local storage is used for the current client session; an HttpOnly-cookie session and refresh-token flow are not implemented.
-- Account recovery, invitation emails, role changes, maintenance history, scheduled events, notifications, and audit-event writing are not implemented as complete features.
-- Browser local storage is used for the current client session state.
-- H2 is in-memory and loses data when the backend stops.
-- PostgreSQL deployment configuration, migrations, and production deployment have not been demonstrated by the current test suite.
-- Automated tests cover authentication and role restrictions, but do not cover every API data constraint, transaction lifecycle, or production deployment behavior.
+- Admins cannot create/invite users or change roles through the authenticated UI/API; public sign-up creates members only, and admin provisioning uses the seed configuration.
+- Members can request and view their requests but cannot cancel a pending request.
+- Maintenance only changes an equipment status. There is no repair ticket, technician assignment, cost, parts, or maintenance history.
+- Calendar entries are loan due dates only. Lab events and scheduling are not supported.
+- Reports show current derived metrics, not configurable date-range exports or historical trend snapshots.
+- The `logs` table/entity is not populated; audit history and notification delivery are not implemented.
+- Password reset, email verification, invitation emails, token refresh/revocation, and HttpOnly-cookie sessions are not implemented. Browser sessions use local storage.
+- A stable `AUTH_TOKEN_SECRET` must be configured in Render and shared by all backend instances. Without it the fallback key is ephemeral and invalidates sessions on restart.
+- H2 is in-memory and loses data when the backend stops; production persistence requires the configured MySQL profile and successful Flyway migration.
+- Automated tests have been added for core flows, but the current deployed Render, Aiven, and Vercel integration has not been confirmed by those tests.
 
 ## 10. Repository Layout
 
