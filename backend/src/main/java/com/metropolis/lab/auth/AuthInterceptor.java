@@ -43,7 +43,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     AuthTokenService.TokenClaims claims = tokenService.claims(token).orElse(null);
     User user = claims == null ? null : userRepository.findById(claims.userId()).orElse(null);
-    if (user == null) {
+    if (user == null || !user.isActive()) {
       response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
       response.setContentType("application/json");
       objectMapper.writeValue(response.getWriter(), Map.of("error", "A valid sign-in is required."));

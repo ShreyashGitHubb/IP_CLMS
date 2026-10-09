@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.auth.token-secret=CLMS-Test-Token-Secret-32-Bytes-Long")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AuthControllerTest {
@@ -176,6 +176,81 @@ class AuthControllerTest {
         .content("{\"role\":\"ADMIN\"}"))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.role").value("ADMIN"));
+  }
+
+  @Test
+  void adminCanDeactivateMemberAndRevokesExistingSessions() throws Exception {
+    User admin = createAdmin("deactivate-admin@example.edu");
+    String adminToken = authTokenService.issue(admin);
+    String memberToken = registerMember("Inactive Member", "inactive@example.edu");
+    Long memberId = userRepository.findByEmailIgnoreCase("inactive@example.edu").orElseThrow().getId();
+
+    mockMvc.perform(patch("/api/users/{id}/active", memberId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"active\":false}"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.active").value(false));
+
+    mockMvc.perform(get("/api/equipment").header("Authorization", "Bearer " + memberToken))
+      .andExpect(status().isUnauthorized());
+    mockMvc.perform(post("/api/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"email\":\"inactive@example.edu\",\"password\":\"Password123\"}"))
+      .andExpect(status().isUnauthorized());
+    org.junit.jupiter.api.Assertions.assertTrue(userRepository.existsById(memberId));
+  }
+
+  @Test
+  void cannotDeactivateSelfLastAdminOrMemberWithActiveLoan() throws Exception {
+    User admin = createAdmin("protected-admin@example.edu");
+    String adminToken = authTokenService.issue(admin);
+    mockMvc.perform(patch("/api/users/{id}/active", admin.getId())
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"active\":false}"))
+      .andExpect(status().isConflict());
+
+    String memberToken = registerMember("Borrowing Member", "borrowing@example.edu");
+    Long memberId = userRepository.findByEmailIgnoreCase("borrowing@example.edu").orElseThrow().getId();
+    jdbcTemplate.update("INSERT INTO equipment (name, category, asset_tag, status, location) VALUES (?, ?, ?, ?, ?)", "Loaned Scope", "Test", "DEACTIVATE-LOAN", "IN_USE", "Lab");
+    Long equipmentId = jdbcTemplate.queryForObject("SELECT id FROM equipment WHERE asset_tag = ?", Long.class, "DEACTIVATE-LOAN");
+    jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, memberId, "BORROW");
+
+    mockMvc.perform(patch("/api/users/{id}/active", memberId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"active\":false}"))
+      .andExpect(status().isConflict());
+    mockMvc.perform(get("/api/equipment").header("Authorization", "Bearer " + memberToken))
+      .andExpect(status().isOk());
+  }
+
+  @Test
+  void maintenanceTicketCanBeResolvedAndEquipmentReturnsToAvailable() throws Exception {
+    User admin = createAdmin("maintenance-admin@example.edu");
+    String adminToken = authTokenService.issue(admin);
+    jdbcTemplate.update("INSERT INTO equipment (name, category, asset_tag, status, location) VALUES (?, ?, ?, ?, ?)", "Repair Scope", "Test", "MAINTENANCE-1", "AVAILABLE", "Lab");
+    Long equipmentId = jdbcTemplate.queryForObject("SELECT id FROM equipment WHERE asset_tag = ?", Long.class, "MAINTENANCE-1");
+
+    String ticketBody = objectMapper.writeValueAsString(java.util.Map.of("equipmentId", equipmentId, "title", "Loose connector", "details", "Connector needs replacement"));
+    String ticketResponse = mockMvc.perform(post("/api/maintenance")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(ticketBody))
+      .andExpect(status().isCreated())
+      .andExpect(jsonPath("$.status").value("OPEN"))
+      .andReturn().getResponse().getContentAsString();
+    Long ticketId = objectMapper.readTree(ticketResponse).get("id").asLong();
+    org.junit.jupiter.api.Assertions.assertEquals("MAINTENANCE", jdbcTemplate.queryForObject("SELECT status FROM equipment WHERE id = ?", String.class, equipmentId));
+
+    mockMvc.perform(patch("/api/maintenance/{id}", ticketId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"status\":\"RESOLVED\"}"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.status").value("RESOLVED"));
+    org.junit.jupiter.api.Assertions.assertEquals("AVAILABLE", jdbcTemplate.queryForObject("SELECT status FROM equipment WHERE id = ?", String.class, equipmentId));
   }
 
   @Test

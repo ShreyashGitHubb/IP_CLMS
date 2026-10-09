@@ -6,5 +6,5 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
   Optional<User> findByEmailIgnoreCase(String email);
-  long countByRole(String role);
+  long countByRoleAndActive(String role, boolean active);
 }

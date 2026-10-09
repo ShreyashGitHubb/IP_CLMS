@@ -12,6 +12,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.http.ResponseEntity;
 import com.metropolis.lab.auth.AuthTokenService;
 import com.metropolis.lab.notification.NotificationService;
+import com.metropolis.lab.transaction.TransactionRepository;
 import java.time.Instant;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -23,9 +24,10 @@ public class UserController {
   private final UserRepository repository;
   private final AuthTokenService tokenService;
   private final NotificationService notifications;
+  private final TransactionRepository transactions;
   private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
   private final SecureRandom secureRandom = new SecureRandom();
-  public UserController(UserRepository repository, AuthTokenService tokenService, NotificationService notifications){this.repository = repository; this.tokenService = tokenService; this.notifications = notifications;}
+  public UserController(UserRepository repository, AuthTokenService tokenService, NotificationService notifications, TransactionRepository transactions){this.repository = repository; this.tokenService = tokenService; this.notifications = notifications; this.transactions = transactions;}
   @GetMapping public List<UserSummary> list(@RequestAttribute("currentUser") User currentUser){
     if (!"ADMIN".equals(currentUser.getRole())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access is required.");
@@ -58,12 +60,31 @@ public class UserController {
     if (user.getId().equals(currentUser.getId()) && !"ADMIN".equals(request.role())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "You cannot remove your own administrator access.");
     }
-    if ("ADMIN".equals(user.getRole()) && !"ADMIN".equals(request.role()) && repository.countByRole("ADMIN") <= 1) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "The last administrator cannot be demoted.");
+    if (user.isActive() && "ADMIN".equals(user.getRole()) && !"ADMIN".equals(request.role()) && repository.countByRoleAndActive("ADMIN", true) <= 1) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "The last active administrator cannot be demoted.");
     }
     user.setRole(request.role());
     tokenService.revokeAll(user.getId());
     return UserSummary.from(repository.save(user));
+  }
+
+  @PatchMapping("/{id}/active")
+  public UserSummary updateActive(@PathVariable Long id, @Valid @RequestBody UpdateActive request, @RequestAttribute("currentUser") User currentUser) {
+    requireAdmin(currentUser);
+    User user = repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+    if (user.getId().equals(currentUser.getId()) && !request.active()) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "You cannot deactivate your own account.");
+    }
+    if ("ADMIN".equals(user.getRole()) && user.isActive() && !request.active() && repository.countByRoleAndActive("ADMIN", true) <= 1) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "The last active administrator cannot be deactivated.");
+    }
+    if (!request.active() && transactions.existsByUserIdAndReturnedAtIsNull(user.getId())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Return all active loans before deactivating this account.");
+    }
+    user.setActive(request.active());
+    User saved = repository.save(user);
+    tokenService.revokeAll(user.getId());
+    return UserSummary.from(saved);
   }
 
   @PostMapping("/{id}/reset-password")
@@ -100,10 +121,11 @@ public class UserController {
   public record CreateUser(@NotBlank @Size(max = 120) String name, @NotBlank @Email String email,
       @NotBlank @Size(min = 8, max = 72) String password, @NotBlank @Pattern(regexp = "MEMBER|ADMIN") String role) {}
   public record UpdateRole(@NotBlank @Pattern(regexp = "MEMBER|ADMIN") String role) {}
+  public record UpdateActive(@jakarta.validation.constraints.NotNull Boolean active) {}
   public record ChangePassword(@NotBlank String currentPassword, @NotBlank @Size(min = 8, max = 72) String newPassword) {}
   public record TemporaryPassword(Long userId, String password) {}
 
-  record UserSummary(Long id, String name, String email, String role, Instant createdAt, boolean mustChangePassword) {
-    static UserSummary from(User user){return new UserSummary(user.getId(), user.getName(), user.getEmail(), user.getRole(), user.getCreatedAt(), user.isMustChangePassword());}
+  record UserSummary(Long id, String name, String email, String role, Instant createdAt, boolean mustChangePassword, boolean active) {
+    static UserSummary from(User user){return new UserSummary(user.getId(), user.getName(), user.getEmail(), user.getRole(), user.getCreatedAt(), user.isMustChangePassword(), user.isActive());}
   }
 }

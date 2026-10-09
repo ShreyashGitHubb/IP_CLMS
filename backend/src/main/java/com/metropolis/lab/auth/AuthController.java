@@ -66,7 +66,7 @@ public class AuthController {
     }
 
     Optional<User> user = userRepository.findByEmailIgnoreCase(email);
-    if (user.isEmpty() || !passwordEncoder.matches(request.password(), user.get().getPasswordHash())) {
+    if (user.isEmpty() || !user.get().isActive() || !passwordEncoder.matches(request.password(), user.get().getPasswordHash())) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid email or password."));
     }
 
