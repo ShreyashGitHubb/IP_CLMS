@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
-import { Check, Plus, Wrench } from 'lucide-react'
+import { Check, Plus, Wrench, X } from 'lucide-react'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, formatDate, type EquipmentItem, type MaintenanceTicket } from '@/lib/clms-api'
 
