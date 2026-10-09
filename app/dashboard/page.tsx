@@ -14,10 +14,12 @@ import {
   FileText,
   HardDrive,
   LogOut,
+  Menu,
   Package,
   ShieldCheck,
   Users,
   Wrench,
+  X,
 } from 'lucide-react'
 import { getApiBaseUrl, getSession, logoutSession, type AuthUser } from '@/lib/auth'
 import type { EquipmentRequest } from '@/lib/clms-api'
@@ -78,6 +80,7 @@ export default function DashboardPage() {
   const [labUsers, setLabUsers] = useState<LabUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   useEffect(() => {
     const session = getSession()
@@ -213,9 +216,14 @@ export default function DashboardPage() {
 
         <div className="h-full min-w-0 flex-1 overflow-y-auto overscroll-contain">
           <header className="sticky top-0 z-30 flex min-h-12 items-center justify-between gap-3 border-b border-white/10 bg-[#111113] px-4 sm:px-6">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-3">
+              <button type="button" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation" aria-expanded={mobileNavOpen} aria-controls="dashboard-mobile-navigation" className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/10 text-[#d8d0ff] lg:hidden">
+                <Menu className="h-4 w-4" />
+              </button>
+              <div className="min-w-0">
               <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">Laboratory / {isAdmin ? 'Dashboard' : 'Member workspace'}</div>
               <div className="mt-0.5 text-[11px]">{isAdmin ? 'Dashboard' : 'My dashboard'}</div>
+              </div>
             </div>
             <div className="flex items-center gap-3 sm:gap-5">
               <div className="hidden items-center gap-2 font-mono text-[8px] uppercase tracking-[0.08em] text-[#9a9aa3] sm:flex">
@@ -240,11 +248,37 @@ export default function DashboardPage() {
             </div>
           </header>
 
-          <nav aria-label="Dashboard sections" className="sticky top-12 z-20 flex gap-2 overflow-x-auto border-b border-white/10 bg-[#141416] px-4 py-2 lg:hidden">
-            {navigation.filter((item) => !item.admin || isAdmin).map(({ label, href }) => (
-              <Link key={label} href={href} className={`shrink-0 border px-3 py-1.5 text-[10px] ${label === 'Dashboard' ? 'border-[#9a80ff]/50 bg-[#9a80ff]/10 text-white' : 'border-white/10 text-[#c6c6cd]'}`}>{label === 'Transactions' && !isAdmin ? 'My activity' : label}</Link>
-            ))}
-          </nav>
+          {mobileNavOpen && <div className="fixed inset-0 z-50 lg:hidden">
+            <button type="button" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} className="absolute inset-0 bg-black/65" />
+            <aside id="dashboard-mobile-navigation" role="dialog" aria-modal="true" aria-label="Dashboard navigation" className="absolute inset-y-0 left-0 flex w-[min(18rem,85vw)] flex-col overflow-y-auto border-r border-white/10 bg-[#171719] px-4 py-5 shadow-2xl">
+              <div className="mb-8 flex items-start justify-between">
+                <a href="#overview" onClick={() => setMobileNavOpen(false)}>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.26em] text-[#9a80ff]">CLMS / 26</div>
+                  <div className="mt-1 text-sm font-medium tracking-tight">LAB / CONTROL</div>
+                </a>
+                <button type="button" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation" className="flex h-8 w-8 items-center justify-center border border-white/10 text-[#c6c6cd]"><X className="h-4 w-4" /></button>
+              </div>
+              {['Manage', 'Operate', 'System'].map((group) => {
+                const items = navigation.filter((item) => item.group === group && (!item.admin || isAdmin))
+                if (!items.length) return null
+                return <div key={group} className="mb-6">
+                  <div className="mb-2 px-2 font-mono text-[8px] uppercase tracking-[0.24em] text-[#777780]">{group}</div>
+                  <nav aria-label={group} className="space-y-1">
+                    {items.map(({ label, href, icon: Icon }) => (
+                      <Link key={label} href={href} onClick={() => setMobileNavOpen(false)} aria-current={label === 'Dashboard' ? 'page' : undefined} className={`flex min-h-11 items-center gap-3 border px-3 text-sm transition ${label === 'Dashboard' ? 'border-white/10 bg-white/[0.07] text-white' : 'border-transparent text-[#c6c6cd] hover:bg-white/[0.04] hover:text-white'}`}>
+                        <Icon className="h-4 w-4 text-[#9a80ff]" />{label === 'Transactions' && !isAdmin ? 'My activity' : label}
+                      </Link>
+                    ))}
+                  </nav>
+                </div>
+              })}
+              <div className="mt-auto border border-white/10 bg-[#131315] p-3">
+                <div className="mb-2 font-mono text-[8px] uppercase tracking-[0.18em] text-[#9a80ff]">Signed in as</div>
+                <div className="truncate text-[10px] text-[#dedee2]">{user.name}</div>
+                <div className="mt-1 font-mono text-[8px] uppercase text-[#777780]">{user.role}</div>
+              </div>
+            </aside>
+          </div>}
 
           <div className="mx-auto max-w-[744px] px-4 py-6 sm:px-6 sm:py-7">
             {loadError ? (
