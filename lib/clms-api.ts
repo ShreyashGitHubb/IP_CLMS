@@ -76,6 +76,7 @@ export type LabUser = {
   email: string
   role: string
   createdAt: string
+  active: boolean
 }
 
 export type MaintenanceTicket = {

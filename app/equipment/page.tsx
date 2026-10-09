@@ -34,6 +34,11 @@ export default function EquipmentPage() {
 
   useEffect(() => {
     setIsAdmin(getSession()?.user.role === 'ADMIN')
+    if (window.location.hash === '#add') {
+      setForm(emptyForm)
+      setFormOpen(true)
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+    }
     refresh()
   }, [])
 
@@ -108,13 +113,16 @@ export default function EquipmentPage() {
       <label className="flex items-center gap-2 font-mono text-[8px] uppercase text-[#8e8e98]">Status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-8 border border-white/10 bg-[#171719] px-2 text-[9px] text-white outline-none"><option value="ALL">All statuses</option><option value="AVAILABLE">Available</option><option value="IN_USE">In use</option><option value="MAINTENANCE">Maintenance</option><option value="RETIRED">Retired</option></select></label>
     </div>
 
-    {isAdmin && formOpen ? <form onSubmit={saveEquipment} className="mb-4 grid gap-3 border border-white/10 bg-[#1b1b1d] p-4 sm:grid-cols-2">
-      <div className="sm:col-span-2 flex items-center justify-between"><h2 className="text-[11px] font-medium">{editing ? 'Edit equipment' : 'New equipment record'}</h2><button type="button" aria-label="Close form" onClick={() => { setEditing(null); setFormOpen(false) }}><X className="h-4 w-4 text-[#999]" /></button></div>
+    {isAdmin && formOpen ? <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !working) { setEditing(null); setFormOpen(false) } }}>
+      <form role="dialog" aria-modal="true" aria-labelledby="equipment-form-title" onSubmit={saveEquipment} className="my-auto grid w-full max-w-xl gap-3 border border-white/10 bg-[#1b1b1d] p-4 shadow-2xl sm:grid-cols-2 sm:p-5">
+      <div className="sm:col-span-2 flex items-center justify-between"><h2 id="equipment-form-title" className="text-[13px] font-medium">{editing ? 'Edit equipment' : 'New equipment record'}</h2><button type="button" aria-label="Close form" disabled={working} onClick={() => { setEditing(null); setFormOpen(false) }}><X className="h-4 w-4 text-[#999]" /></button></div>
+      {error ? <div role="alert" className="sm:col-span-2 border border-red-400/30 bg-red-950/30 px-3 py-2 text-[10px] text-red-100">{error}</div> : null}
       {([['name', 'Name'], ['category', 'Category'], ['assetTag', 'Asset tag'], ['location', 'Location']] as const).map(([key, label]) => <label key={key} className="space-y-1 font-mono text-[8px] uppercase tracking-[0.12em] text-[#8b8b94]">{label}<input required value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} className="h-8 w-full border border-white/10 bg-[#111113] px-2 font-sans text-[10px] normal-case text-white outline-none focus:border-[#9a80ff]" /></label>)}
       <label className="space-y-1 font-mono text-[8px] uppercase tracking-[0.12em] text-[#8b8b94]">Status<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as EquipmentItem['status'] })} className="h-8 w-full border border-white/10 bg-[#111113] px-2 font-sans text-[10px] text-white outline-none"><option value="AVAILABLE">Available</option><option value="IN_USE">In use</option><option value="MAINTENANCE">Maintenance</option><option value="RETIRED">Retired</option></select></label>
       <label className="space-y-1 font-mono text-[8px] uppercase tracking-[0.12em] text-[#8b8b94] sm:col-span-2">Description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={2} className="w-full border border-white/10 bg-[#111113] px-2 py-1.5 font-sans text-[10px] normal-case text-white outline-none focus:border-[#9a80ff]" /></label>
-      <div className="sm:col-span-2 flex justify-end"><button disabled={working} className="inline-flex h-8 items-center gap-2 bg-[#8e73ff] px-3 text-[9px] uppercase tracking-[0.1em] disabled:opacity-50"><Check className="h-3 w-3" />{working ? 'Saving…' : 'Save record'}</button></div>
-    </form> : null}
+      <div className="sm:col-span-2 flex justify-end gap-2"><button type="button" disabled={working} onClick={() => { setEditing(null); setFormOpen(false) }} className="h-8 border border-white/15 px-3 text-[9px] uppercase disabled:opacity-50">Cancel</button><button disabled={working} className="inline-flex h-8 items-center gap-2 bg-[#8e73ff] px-3 text-[9px] uppercase tracking-[0.1em] disabled:opacity-50"><Check className="h-3 w-3" />{working ? 'Saving…' : 'Save record'}</button></div>
+    </form>
+    </div> : null}
     {loading ? <p className="py-12 text-center text-[10px] text-[#85858e]">Loading equipment from the lab database…</p> : visibleItems.length === 0 ? <p className="border border-dashed border-white/10 py-12 text-center text-[10px] text-[#85858e]">No equipment matches this view.</p> : <div className="grid gap-2.5 md:grid-cols-2">
       {visibleItems.map((item) => <article key={item.id} className="border border-white/10 bg-[#1b1b1d] p-3.5">
         <div className="mb-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-mono text-[7px] uppercase tracking-[0.16em] text-[#777780]">{item.category}</div><h2 className="mt-1 truncate text-[13px] font-medium">{item.name}</h2><div className="mt-1 font-mono text-[7px] uppercase text-[#777780]">{item.assetTag} · {item.location}</div></div>

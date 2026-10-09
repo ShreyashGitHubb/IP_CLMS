@@ -16,13 +16,14 @@ import {
   LogOut,
   Menu,
   Package,
+  Plus,
   ShieldCheck,
   Users,
   Wrench,
   X,
 } from 'lucide-react'
-import { getApiBaseUrl, getSession, logoutSession, type AuthUser } from '@/lib/auth'
-import type { EquipmentRequest } from '@/lib/clms-api'
+import { clearSession, getApiBaseUrl, getSession, logoutSession, type AuthUser } from '@/lib/auth'
+import type { EquipmentRequest, NotificationItem } from '@/lib/clms-api'
 
 type EquipmentItem = {
   id: number
@@ -78,9 +79,13 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<LoanTransaction[]>([])
   const [requests, setRequests] = useState<EquipmentRequest[]>([])
   const [labUsers, setLabUsers] = useState<LabUser[]>([])
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
+  const [notificationsError, setNotificationsError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false)
 
   useEffect(() => {
     const session = getSession()
@@ -91,6 +96,7 @@ export default function DashboardPage() {
     setUser(session.user)
 
     const controller = new AbortController()
+    const notificationController = new AbortController()
     const apiBaseUrl = getApiBaseUrl()
     const headers = { Authorization: `Bearer ${session.token}` }
     const dataRequests = [
@@ -126,7 +132,27 @@ export default function DashboardPage() {
       })
       .finally(() => setIsLoading(false))
 
-    return () => controller.abort()
+    fetch(`${apiBaseUrl}/api/notifications`, { headers, signal: notificationController.signal })
+      .then(async (response) => {
+        if (response.status === 401) {
+          clearSession()
+          router.replace('/sign-in')
+          throw new Error('Your session expired. Sign in again.')
+        }
+        if (!response.ok) throw new Error('Notifications are temporarily unavailable.')
+        return response.json() as Promise<NotificationItem[]>
+      })
+      .then(setNotifications)
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.name === 'AbortError') return
+        setNotificationsError(error instanceof Error ? error.message : 'Could not load notifications.')
+      })
+      .finally(() => setNotificationsLoading(false))
+
+    return () => {
+      controller.abort()
+      notificationController.abort()
+    }
   }, [router])
 
   const isAdmin = user?.role === 'ADMIN'
@@ -136,6 +162,14 @@ export default function DashboardPage() {
   const visibleTransactions = isAdmin ? transactions : myTransactions
   const activeLoans = visibleTransactions.filter(isActiveLoan)
   const overdueLoans = activeLoans.filter((transaction) => transaction.dueAt && new Date(transaction.dueAt).getTime() < Date.now())
+  const dueSoonLoans = activeLoans
+    .filter((transaction) => {
+      if (!transaction.dueAt) return false
+      const dueAt = new Date(transaction.dueAt).getTime()
+      return dueAt >= Date.now() && dueAt <= Date.now() + 48 * 60 * 60 * 1000
+    })
+    .sort((left, right) => new Date(left.dueAt!).getTime() - new Date(right.dueAt!).getTime())
+  const unreadNotifications = notifications.filter((notification) => !notification.readAt).length
   const availableEquipment = equipment.filter((item) => item.status === 'AVAILABLE')
   const maintenanceEquipment = equipment.filter((item) => item.status === 'MAINTENANCE')
   const pendingRequests = requests.filter((request) => request.status === 'PENDING')
@@ -179,6 +213,13 @@ export default function DashboardPage() {
     await logoutSession()
     router.push('/sign-in')
   }
+
+  const adminCreateActions = [
+    { label: 'Add equipment', href: '/equipment#add', icon: Boxes },
+    { label: 'Create account', href: '/students#add', icon: Users },
+    { label: 'Log maintenance incident', href: '/maintenance#add', icon: Wrench },
+    { label: 'Schedule lab event', href: '/calendar#add', icon: CalendarDays },
+  ]
 
   if (!user) {
     return null
@@ -245,8 +286,21 @@ export default function DashboardPage() {
               <button onClick={handleLogout} aria-label="Log out" title="Log out" className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#bdbdc4] transition hover:border-red-400/40 hover:text-red-200">
                 <LogOut className="h-3.5 w-3.5" />
               </button>
+              {isAdmin ? <button type="button" onClick={() => setQuickCreateOpen(true)} aria-label="Create new record" title="Create new record" className="flex h-7 w-7 items-center justify-center border border-[#9a80ff]/40 text-[#cbbcff] hover:bg-[#9a80ff]/10"><Plus className="h-4 w-4" /></button> : null}
             </div>
           </header>
+
+          {quickCreateOpen && isAdmin ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setQuickCreateOpen(false) }}>
+            <section role="dialog" aria-modal="true" aria-labelledby="quick-create-title" className="w-full max-w-sm border border-white/10 bg-[#1b1b1d] p-4 shadow-2xl">
+              <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                <div><div className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#9a80ff]">Admin actions</div><h2 id="quick-create-title" className="mt-1 text-[13px]">Create new</h2></div>
+                <button type="button" onClick={() => setQuickCreateOpen(false)} aria-label="Close create menu" className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#aaa]"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="space-y-1">
+                {adminCreateActions.map(({ label, href, icon: Icon }) => <Link key={href} href={href} onClick={() => setQuickCreateOpen(false)} className="flex min-h-11 items-center gap-3 border border-transparent px-3 text-[11px] text-[#dedee2] hover:border-white/10 hover:bg-white/[0.04]"><Icon className="h-4 w-4 text-[#9a80ff]" />{label}<ArrowRight className="ml-auto h-3 w-3 text-[#777780]" /></Link>)}
+              </div>
+            </section>
+          </div> : null}
 
           {mobileNavOpen && <div className="fixed inset-0 z-50 lg:hidden">
             <button type="button" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} className="absolute inset-0 bg-black/65" />
@@ -304,6 +358,47 @@ export default function DashboardPage() {
               <div aria-hidden="true" className="relative min-h-44 overflow-hidden border-t border-white/10 bg-[#211c2b] md:border-l md:border-t-0" style={{ backgroundImage: 'linear-gradient(rgba(160,130,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(160,130,255,0.07) 1px, transparent 1px)', backgroundSize: '19px 19px' }}>
                 <div className="absolute right-[-4%] top-[10%] h-[62%] w-[48%] rotate-[-8deg] bg-gradient-to-br from-[#cc6ba9] to-[#715deb]" style={{ clipPath: 'polygon(18% 0, 100% 14%, 100% 78%, 58% 100%, 0 72%, 8% 30%)' }} />
                 <div className="absolute bottom-[12%] left-[9%] h-[30%] w-[27%] rotate-[5deg] bg-gradient-to-br from-[#c89a65] to-[#a44365]" style={{ clipPath: 'polygon(8% 10%, 75% 0, 100% 40%, 91% 100%, 23% 88%, 0 48%)' }} />
+              </div>
+            </section>
+
+            <section aria-label="Alerts and notifications" className="mb-5 grid gap-3 md:grid-cols-2">
+              <div className="border border-white/10 bg-[#1b1b1d] p-4">
+                <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">Inbox</div>
+                    <h2 className="mt-1 text-[11px]">{unreadNotifications} unread notification{unreadNotifications === 1 ? '' : 's'}</h2>
+                  </div>
+                  <Link href="/notifications" aria-label="Open notifications" title="Open notifications" className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#c6b6ff]"><Bell className="h-3.5 w-3.5" /></Link>
+                </div>
+                {notificationsLoading ? <p className="py-3 text-[9px] text-[#85858e]">Loading inbox…</p> : notificationsError ? <p role="status" className="py-3 text-[9px] text-amber-200">{notificationsError}</p> : notifications.length === 0 ? <p className="py-3 text-[9px] text-[#85858e]">No notifications yet.</p> : <div className="space-y-2">
+                  {notifications.slice(0, 3).map((notification) => <Link key={notification.id} href="/notifications" className="flex items-start gap-2 border-b border-white/[0.07] py-2 last:border-0">
+                    <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${notification.readAt ? 'bg-[#65656d]' : 'bg-[#b49eff]'}`} />
+                    <span className="min-w-0 flex-1"><span className="block truncate text-[9px] font-medium text-[#eeeeef]">{notification.title}</span><span className="mt-1 block truncate text-[8px] text-[#85858e]">{notification.message}</span></span>
+                    <time className="shrink-0 font-mono text-[7px] text-[#777780]">{formatDate(notification.createdAt)}</time>
+                  </Link>)}
+                  <Link href="/notifications" className="inline-flex items-center gap-1 pt-1 font-mono text-[7px] uppercase tracking-[0.08em] text-[#b49eff]">View inbox <ArrowRight className="h-2.5 w-2.5" /></Link>
+                </div>}
+              </div>
+
+              <div className="border border-white/10 bg-[#1b1b1d] p-4">
+                <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-[#777780]">Loan reminders</div>
+                    <h2 className="mt-1 text-[11px]">{overdueLoans.length} overdue · {dueSoonLoans.length} due in 48 hours</h2>
+                  </div>
+                  <Link href="/transactions" aria-label="Open transactions" title="Open transactions" className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#c6b6ff]"><ArrowRight className="h-3.5 w-3.5" /></Link>
+                </div>
+                {overdueLoans.length === 0 && dueSoonLoans.length === 0 ? <p className="py-3 text-[9px] text-[#85858e]">No overdue or upcoming due dates.</p> : <div className="space-y-2">
+                  {[...overdueLoans, ...dueSoonLoans].slice(0, 4).map((transaction) => {
+                    const overdue = Boolean(transaction.dueAt && new Date(transaction.dueAt).getTime() < Date.now())
+                    const item = equipmentById.get(transaction.equipmentId)
+                    const memberName = userById.get(transaction.userId)?.name ?? `Member #${transaction.userId}`
+                    return <Link key={transaction.id} href="/transactions" className="flex items-center justify-between gap-3 border-b border-white/[0.07] py-2 last:border-0">
+                      <span className="min-w-0"><span className="block truncate text-[9px] text-[#eeeeef]">{item?.name ?? `Equipment #${transaction.equipmentId}`}</span><span className="mt-1 block truncate text-[8px] text-[#85858e]">{isAdmin ? `${memberName} · ` : ''}Due {formatDate(transaction.dueAt)}</span></span>
+                      <span className={`shrink-0 font-mono text-[7px] uppercase ${overdue ? 'text-amber-300' : 'text-[#b49eff]'}`}>{overdue ? 'Overdue' : 'Due soon'}</span>
+                    </Link>
+                  })}
+                </div>}
               </div>
             </section>
 
