@@ -4,14 +4,16 @@ import { useEffect, useState } from 'react'
 import { Bell, Check, CheckCheck } from 'lucide-react'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, formatDate, type NotificationItem } from '@/lib/clms-api'
+import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 
 export default function NotificationsPage() {
+  const liveRevision = useApiLiveRevision()
   const [items, setItems] = useState<NotificationItem[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
   const refresh = () => apiRequest<NotificationItem[]>('/api/notifications').then(setItems).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load notifications.')).finally(() => setLoading(false))
-  useEffect(() => { void refresh() }, [])
+  useEffect(() => { void refresh() }, [liveRevision])
 
   const markRead = async (id?: number) => {
     setError('')

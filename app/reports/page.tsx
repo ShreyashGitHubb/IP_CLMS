@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, isActiveLoan, type EquipmentItem, type LabUser, type LoanTransaction } from '@/lib/clms-api'
+import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 
 export default function ReportsPage() {
+  const liveRevision = useApiLiveRevision()
   const [equipment, setEquipment] = useState<EquipmentItem[]>([])
   const [transactions, setTransactions] = useState<LoanTransaction[]>([])
   const [users, setUsers] = useState<LabUser[]>([])
@@ -19,7 +21,7 @@ export default function ReportsPage() {
       .then(([items, rows, labUsers]) => { setEquipment(items); setTransactions(rows); setUsers(labUsers) })
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load report data.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [liveRevision])
 
   const filteredTransactions = transactions.filter((transaction) => {
     const created = new Date(transaction.createdAt).getTime()

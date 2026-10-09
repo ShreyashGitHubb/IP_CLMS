@@ -5,8 +5,10 @@ import { CalendarPlus, ChevronLeft, ChevronRight, Trash2, X } from 'lucide-react
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, formatDate, type EquipmentItem, type LabEvent, type LoanTransaction } from '@/lib/clms-api'
 import { getSession } from '@/lib/auth'
+import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 
 export default function CalendarPage() {
+  const liveRevision = useApiLiveRevision()
   const [transactions, setTransactions] = useState<LoanTransaction[]>([])
   const [equipment, setEquipment] = useState<EquipmentItem[]>([])
   const [events, setEvents] = useState<LabEvent[]>([])
@@ -29,7 +31,7 @@ export default function CalendarPage() {
       .then(([rows, items, labEvents]) => { setTransactions(rows); setEquipment(items); setEvents(labEvents) })
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load due dates.'))
       .finally(() => setLoading(false))
-  }, [revision])
+  }, [liveRevision, revision])
 
   const dueLoans = useMemo(() => transactions.filter((row) => !row.returnedAt && row.dueAt && new Date(row.dueAt).getFullYear() === month.getFullYear() && new Date(row.dueAt).getMonth() === month.getMonth()).sort((a, b) => new Date(a.dueAt!).getTime() - new Date(b.dueAt!).getTime()), [month, transactions])
   const monthEvents = events.filter((event) => new Date(event.startsAt).getFullYear() === month.getFullYear() && new Date(event.startsAt).getMonth() === month.getMonth())

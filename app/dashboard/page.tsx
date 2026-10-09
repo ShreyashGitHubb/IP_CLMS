@@ -22,8 +22,9 @@ import {
   Wrench,
   X,
 } from 'lucide-react'
-import { clearSession, getApiBaseUrl, getSession, logoutSession, type AuthUser } from '@/lib/auth'
-import type { EquipmentRequest, NotificationItem } from '@/lib/clms-api'
+import { getSession, logoutSession, type AuthUser } from '@/lib/auth'
+import { apiRequest, type EquipmentRequest, type NotificationItem } from '@/lib/clms-api'
+import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 
 type EquipmentItem = {
   id: number
@@ -74,6 +75,7 @@ const isActiveLoan = (transaction: LoanTransaction) =>
 
 export default function DashboardPage() {
   const router = useRouter()
+  const liveRevision = useApiLiveRevision()
   const [user, setUser] = useState<AuthUser | null>(null)
   const [equipment, setEquipment] = useState<EquipmentItem[]>([])
   const [transactions, setTransactions] = useState<LoanTransaction[]>([])
@@ -95,65 +97,33 @@ export default function DashboardPage() {
     }
     setUser(session.user)
 
-    const controller = new AbortController()
-    const notificationController = new AbortController()
-    const apiBaseUrl = getApiBaseUrl()
-    const headers = { Authorization: `Bearer ${session.token}` }
-    const dataRequests = [
-      fetch(`${apiBaseUrl}/api/equipment`, { headers, signal: controller.signal }),
-      fetch(`${apiBaseUrl}/api/transactions`, { headers, signal: controller.signal }),
-      fetch(`${apiBaseUrl}/api/requests`, { headers, signal: controller.signal }),
+    const dataRequests: Promise<unknown>[] = [
+      apiRequest<EquipmentItem[]>('/api/equipment'),
+      apiRequest<LoanTransaction[]>('/api/transactions'),
+      apiRequest<EquipmentRequest[]>('/api/requests'),
     ]
     if (session.user.role === 'ADMIN') {
-      dataRequests.push(fetch(`${apiBaseUrl}/api/users`, { headers, signal: controller.signal }))
+      dataRequests.push(apiRequest<LabUser[]>('/api/users'))
     }
     Promise.all(dataRequests)
-      .then(async (responses) => {
-        if (responses.some((response) => response.status === 401)) {
-          clearSession()
-          router.replace('/sign-in')
-          return
-        }
-        if (responses.some((response) => !response.ok)) {
-          throw new Error('Could not load laboratory data. Please try again.')
-        }
-        const equipmentData = await responses[0].json() as EquipmentItem[]
-        const transactionData = await responses[1].json() as LoanTransaction[]
-        const requestsData = await responses[2].json() as EquipmentRequest[]
-        const usersData = responses[3] ? await responses[3].json() as LabUser[] : []
-        setEquipment(equipmentData)
-        setTransactions(transactionData)
-        setRequests(requestsData)
-        setLabUsers(usersData ?? [])
+      .then((responses) => {
+        setEquipment(responses[0] as EquipmentItem[])
+        setTransactions(responses[1] as LoanTransaction[])
+        setRequests(responses[2] as EquipmentRequest[])
+        setLabUsers((responses[3] as LabUser[] | undefined) ?? [])
       })
       .catch((error: unknown) => {
-        if (error instanceof Error && error.name === 'AbortError') return
         setLoadError(error instanceof Error ? error.message : 'Could not load laboratory data.')
       })
       .finally(() => setIsLoading(false))
 
-    fetch(`${apiBaseUrl}/api/notifications`, { headers, signal: notificationController.signal })
-      .then(async (response) => {
-        if (response.status === 401) {
-          clearSession()
-          router.replace('/sign-in')
-          throw new Error('Your session expired. Sign in again.')
-        }
-        if (!response.ok) throw new Error('Notifications are temporarily unavailable.')
-        return response.json() as Promise<NotificationItem[]>
-      })
+    apiRequest<NotificationItem[]>('/api/notifications')
       .then(setNotifications)
       .catch((error: unknown) => {
-        if (error instanceof Error && error.name === 'AbortError') return
         setNotificationsError(error instanceof Error ? error.message : 'Could not load notifications.')
       })
       .finally(() => setNotificationsLoading(false))
-
-    return () => {
-      controller.abort()
-      notificationController.abort()
-    }
-  }, [router])
+  }, [liveRevision, router])
 
   const isAdmin = user?.role === 'ADMIN'
   const hour = new Date().getHours()

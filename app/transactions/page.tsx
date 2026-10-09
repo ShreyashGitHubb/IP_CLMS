@@ -5,8 +5,10 @@ import { Check, RotateCcw } from 'lucide-react'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, formatDate, isActiveLoan, type EquipmentItem, type LabUser, type LoanTransaction } from '@/lib/clms-api'
 import { getSession } from '@/lib/auth'
+import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 
 export default function TransactionsPage() {
+  const liveRevision = useApiLiveRevision()
   const [transactions, setTransactions] = useState<LoanTransaction[]>([])
   const [equipment, setEquipment] = useState<EquipmentItem[]>([])
   const [users, setUsers] = useState<LabUser[]>([])
@@ -32,7 +34,7 @@ export default function TransactionsPage() {
       })
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load transactions.'))
       .finally(() => setLoading(false))
-  }, [revision])
+  }, [liveRevision, revision])
 
   const returnLoan = async (transaction: LoanTransaction) => {
     setError('')

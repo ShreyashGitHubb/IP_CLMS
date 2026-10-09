@@ -6,8 +6,10 @@ import { Ban, Check, Copy, KeyRound, Plus, ShieldCheck, Trash2, UserPlus, X } fr
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, formatDate, type LabUser } from '@/lib/clms-api'
 import { getSession } from '@/lib/auth'
+import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 
 export default function StudentsPage() {
+  const liveRevision = useApiLiveRevision()
   const [users, setUsers] = useState<LabUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -29,7 +31,7 @@ export default function StudentsPage() {
       .then(setUsers)
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load users.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [liveRevision])
 
   const createAccount = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

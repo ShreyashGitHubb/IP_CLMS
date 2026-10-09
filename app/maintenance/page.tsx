@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useState } from 'react'
 import { Check, Plus, Wrench, X } from 'lucide-react'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, formatDate, type EquipmentItem, type MaintenanceTicket } from '@/lib/clms-api'
+import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 
 export default function MaintenancePage() {
+  const liveRevision = useApiLiveRevision()
   const [items, setItems] = useState<EquipmentItem[]>([])
   const [tickets, setTickets] = useState<MaintenanceTicket[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,7 +26,7 @@ export default function MaintenancePage() {
       .then(([equipment, maintenance]) => { setItems(equipment); setTickets(maintenance) })
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load inventory.'))
       .finally(() => setLoading(false))
-  }, [revision])
+  }, [liveRevision, revision])
 
   const createTicket = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

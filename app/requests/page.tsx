@@ -5,8 +5,10 @@ import { Check, X, Ban } from 'lucide-react'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, formatDate, type EquipmentItem, type EquipmentRequest, type LabUser } from '@/lib/clms-api'
 import { getSession } from '@/lib/auth'
+import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 
 export default function RequestsPage() {
+  const liveRevision = useApiLiveRevision()
   const [requests, setRequests] = useState<EquipmentRequest[]>([])
   const [equipment, setEquipment] = useState<EquipmentItem[]>([])
   const [users, setUsers] = useState<LabUser[]>([])
@@ -31,7 +33,7 @@ export default function RequestsPage() {
       })
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load requests.'))
       .finally(() => setLoading(false))
-  }, [revision])
+  }, [liveRevision, revision])
 
   const decide = async (request: EquipmentRequest, status: 'APPROVED' | 'REJECTED') => {
     setError('')

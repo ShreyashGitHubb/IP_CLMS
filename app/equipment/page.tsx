@@ -5,10 +5,12 @@ import { Check, Edit2, Plus, Search, Trash2, X } from 'lucide-react'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, type EquipmentItem } from '@/lib/clms-api'
 import { getSession } from '@/lib/auth'
+import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 
 const emptyForm = { name: '', category: '', assetTag: '', status: 'AVAILABLE' as EquipmentItem['status'], location: '', description: '' }
 
 export default function EquipmentPage() {
+  const liveRevision = useApiLiveRevision()
   const [items, setItems] = useState<EquipmentItem[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -40,7 +42,7 @@ export default function EquipmentPage() {
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
     }
     refresh()
-  }, [])
+  }, [liveRevision])
 
   const visibleItems = items.filter((item) => {
     const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
