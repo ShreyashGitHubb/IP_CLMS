@@ -6,6 +6,7 @@ import com.metropolis.lab.equipment.EquipmentStatus;
 import com.metropolis.lab.transaction.Transaction;
 import com.metropolis.lab.transaction.TransactionRepository;
 import com.metropolis.lab.user.User;
+import com.metropolis.lab.user.UserRepository;
 import com.metropolis.lab.notification.NotificationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -25,12 +26,14 @@ public class EquipmentRequestController {
   private final EquipmentRepository equipment;
   private final TransactionRepository transactions;
   private final NotificationService notifications;
+  private final UserRepository users;
 
-  public EquipmentRequestController(EquipmentRequestRepository requests, EquipmentRepository equipment, TransactionRepository transactions, NotificationService notifications) {
+  public EquipmentRequestController(EquipmentRequestRepository requests, EquipmentRepository equipment, TransactionRepository transactions, NotificationService notifications, UserRepository users) {
     this.requests = requests;
     this.equipment = equipment;
     this.transactions = transactions;
     this.notifications = notifications;
+    this.users = users;
   }
 
   @GetMapping
@@ -40,6 +43,7 @@ public class EquipmentRequestController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
+  @Transactional
   public EquipmentRequest create(@Valid @RequestBody CreateRequest body, @RequestAttribute("currentUser") User user) {
     Equipment item = equipment.findById(body.equipmentId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
     if (item.getStatus() != EquipmentStatus.AVAILABLE) {
@@ -53,7 +57,12 @@ public class EquipmentRequestController {
     request.setUserId(user.getId());
     request.setPurpose(body.purpose().trim());
     request.setDueAt(body.dueAt());
-    return requests.save(request);
+    EquipmentRequest saved = requests.save(request);
+    String message = user.getName() + " requested " + item.getName() + ": " + request.getPurpose();
+    users.findAllByRoleAndActive("ADMIN", true).forEach(admin ->
+      notifications.create(admin.getId(), "New equipment request", message)
+    );
+    return saved;
   }
 
   @DeleteMapping("/{id}")

@@ -5,14 +5,20 @@ import org.springframework.stereotype.Service;
 @Service
 public class NotificationService {
   private final NotificationRepository repository;
+  private final LiveUpdateService liveUpdates;
 
-  public NotificationService(NotificationRepository repository) { this.repository = repository; }
+  public NotificationService(NotificationRepository repository, LiveUpdateService liveUpdates) {
+    this.repository = repository;
+    this.liveUpdates = liveUpdates;
+  }
 
   public Notification create(Long userId, String title, String message) {
     Notification notification = new Notification();
     notification.setUserId(userId);
     notification.setTitle(title);
     notification.setMessage(message);
-    return repository.save(notification);
+    Notification saved = repository.save(notification);
+    liveUpdates.notifyUser(userId);
+    return saved;
   }
 }

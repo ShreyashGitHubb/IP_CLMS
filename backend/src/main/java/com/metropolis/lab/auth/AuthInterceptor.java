@@ -5,6 +5,7 @@ import com.metropolis.lab.user.User;
 import com.metropolis.lab.user.UserRepository;
 import com.metropolis.lab.log.AuditLog;
 import com.metropolis.lab.log.AuditLogRepository;
+import com.metropolis.lab.notification.LiveUpdateService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -22,12 +23,14 @@ public class AuthInterceptor implements HandlerInterceptor {
   private final UserRepository userRepository;
   private final ObjectMapper objectMapper;
   private final AuditLogRepository auditLogs;
+  private final LiveUpdateService liveUpdates;
 
-  public AuthInterceptor(AuthTokenService tokenService, UserRepository userRepository, ObjectMapper objectMapper, AuditLogRepository auditLogs) {
+  public AuthInterceptor(AuthTokenService tokenService, UserRepository userRepository, ObjectMapper objectMapper, AuditLogRepository auditLogs, LiveUpdateService liveUpdates) {
     this.tokenService = tokenService;
     this.userRepository = userRepository;
     this.objectMapper = objectMapper;
     this.auditLogs = auditLogs;
+    this.liveUpdates = liveUpdates;
   }
 
   @Override
@@ -81,5 +84,6 @@ public class AuthInterceptor implements HandlerInterceptor {
     log.setEntityType(request.getRequestURI().split("/")[2]);
     log.setDetails("HTTP " + response.getStatus());
     auditLogs.save(log);
+    liveUpdates.notifyAllUsers();
   }
 }
