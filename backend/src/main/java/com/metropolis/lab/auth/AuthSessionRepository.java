@@ -8,4 +8,5 @@ import java.util.List;
 public interface AuthSessionRepository extends JpaRepository<AuthSession, Long> {
   Optional<AuthSession> findBySessionIdAndRevokedAtIsNullAndExpiresAtAfter(String sessionId, Instant now);
   List<AuthSession> findAllByUserIdAndRevokedAtIsNull(Long userId);
+  void deleteAllByUserId(Long userId);
 }

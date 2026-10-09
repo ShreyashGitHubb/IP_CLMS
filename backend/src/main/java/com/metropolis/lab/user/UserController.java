@@ -11,8 +11,11 @@ import jakarta.validation.constraints.Size;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.http.ResponseEntity;
 import com.metropolis.lab.auth.AuthTokenService;
+import com.metropolis.lab.auth.AuthSessionRepository;
 import com.metropolis.lab.notification.NotificationService;
+import com.metropolis.lab.notification.NotificationRepository;
 import com.metropolis.lab.transaction.TransactionRepository;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -25,9 +28,11 @@ public class UserController {
   private final AuthTokenService tokenService;
   private final NotificationService notifications;
   private final TransactionRepository transactions;
+  private final AuthSessionRepository sessions;
+  private final NotificationRepository notificationRepository;
   private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
   private final SecureRandom secureRandom = new SecureRandom();
-  public UserController(UserRepository repository, AuthTokenService tokenService, NotificationService notifications, TransactionRepository transactions){this.repository = repository; this.tokenService = tokenService; this.notifications = notifications; this.transactions = transactions;}
+  public UserController(UserRepository repository, AuthTokenService tokenService, NotificationService notifications, TransactionRepository transactions, AuthSessionRepository sessions, NotificationRepository notificationRepository){this.repository = repository; this.tokenService = tokenService; this.notifications = notifications; this.transactions = transactions; this.sessions = sessions; this.notificationRepository = notificationRepository;}
   @GetMapping public List<UserSummary> list(@RequestAttribute("currentUser") User currentUser){
     if (!"ADMIN".equals(currentUser.getRole())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access is required.");
@@ -85,6 +90,26 @@ public class UserController {
     User saved = repository.save(user);
     tokenService.revokeAll(user.getId());
     return UserSummary.from(saved);
+  }
+
+  @DeleteMapping("/{id}")
+  @Transactional
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void delete(@PathVariable Long id, @RequestAttribute("currentUser") User currentUser) {
+    requireAdmin(currentUser);
+    User user = repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+    if (user.getId().equals(currentUser.getId())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "You cannot delete your own account.");
+    }
+    if (user.isActive() && "ADMIN".equals(user.getRole()) && repository.countByRoleAndActive("ADMIN", true) <= 1) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "The last active administrator cannot be deleted.");
+    }
+    if (repository.hasOperationalHistory(user.getId())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "This account has linked records. Deactivate it to preserve its history.");
+    }
+    sessions.deleteAllByUserId(user.getId());
+    notificationRepository.deleteAllByUserId(user.getId());
+    repository.delete(user);
   }
 
   @PostMapping("/{id}/reset-password")

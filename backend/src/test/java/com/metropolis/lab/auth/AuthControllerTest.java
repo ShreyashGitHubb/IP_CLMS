@@ -16,6 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -176,6 +177,49 @@ class AuthControllerTest {
         .content("{\"role\":\"ADMIN\"}"))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.role").value("ADMIN"));
+  }
+
+  @Test
+  void adminCanDeleteUnusedAccountAndItsSessionAndNotifications() throws Exception {
+    User admin = createAdmin("delete-admin@example.edu");
+    String adminToken = authTokenService.issue(admin);
+    String createBody = """
+      {"name":"Unused Member","email":"unused@example.edu","password":"Temporary123","role":"MEMBER"}
+      """;
+    String response = mockMvc.perform(post("/api/users")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(createBody))
+      .andExpect(status().isCreated())
+      .andReturn().getResponse().getContentAsString();
+    Long memberId = objectMapper.readTree(response).get("id").asLong();
+    authTokenService.issue(userRepository.findById(memberId).orElseThrow());
+
+    mockMvc.perform(delete("/api/users/{id}", memberId).header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isNoContent());
+
+    org.junit.jupiter.api.Assertions.assertFalse(userRepository.existsById(memberId));
+    org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM auth_sessions WHERE user_id = ?", Integer.class, memberId));
+    org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ?", Integer.class, memberId));
+  }
+
+  @Test
+  void adminCannotDeleteAccountWithOperationalHistory() throws Exception {
+    User admin = createAdmin("delete-history-admin@example.edu");
+    String adminToken = authTokenService.issue(admin);
+    String memberToken = registerMember("History Member", "history-member@example.edu");
+    Long memberId = userRepository.findByEmailIgnoreCase("history-member@example.edu").orElseThrow().getId();
+    jdbcTemplate.update("INSERT INTO equipment (name, category, asset_tag, status, location) VALUES (?, ?, ?, ?, ?)", "History Scope", "Test", "DELETE-HISTORY-1", "AVAILABLE", "Lab");
+    Long equipmentId = jdbcTemplate.queryForObject("SELECT id FROM equipment WHERE asset_tag = ?", Long.class, "DELETE-HISTORY-1");
+    jdbcTemplate.update("INSERT INTO equipment_requests (equipment_id, user_id, purpose, status) VALUES (?, ?, ?, ?)", equipmentId, memberId, "Coursework", "PENDING");
+
+    mockMvc.perform(delete("/api/users/{id}", memberId).header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isConflict())
+      .andExpect(jsonPath("$.error").value("This account has linked records. Deactivate it to preserve its history."));
+
+    org.junit.jupiter.api.Assertions.assertTrue(userRepository.existsById(memberId));
+    mockMvc.perform(get("/api/equipment").header("Authorization", "Bearer " + memberToken))
+      .andExpect(status().isOk());
   }
 
   @Test
