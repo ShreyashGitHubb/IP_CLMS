@@ -13,6 +13,7 @@ public class CorsConfig implements WebMvcConfigurer {
   private static final List<String> DEFAULT_ORIGINS = List.of(
       "https://ip-clms.vercel.app",
       "https://ip-clms-*.vercel.app",
+      "https://clms.shreyashvishwakarma.in",
       "http://localhost:3000"
   );
 

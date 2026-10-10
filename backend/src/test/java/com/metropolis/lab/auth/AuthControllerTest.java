@@ -333,6 +333,16 @@ class AuthControllerTest {
         .string("Access-Control-Allow-Origin", "https://ip-clms.vercel.app"))
       .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
         .string("Access-Control-Allow-Methods", org.hamcrest.Matchers.containsString("GET")));
+
+    mockMvc.perform(options("/api/auth/login")
+        .header("Origin", "https://clms.shreyashvishwakarma.in")
+        .header("Access-Control-Request-Method", "POST")
+        .header("Access-Control-Request-Headers", "authorization,content-type"))
+      .andExpect(status().isOk())
+      .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+        .string("Access-Control-Allow-Origin", "https://clms.shreyashvishwakarma.in"))
+      .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+        .string("Access-Control-Allow-Methods", org.hamcrest.Matchers.containsString("POST")));
   }
 
   @Test

@@ -82,11 +82,11 @@ Deploy the Next.js app to a frontend host such as Vercel. Set this environment v
 
 | Variable | Value |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | `https://YOUR-BACKEND-HOST` with no trailing slash |
+| `NEXT_PUBLIC_API_URL` | `https://ip-clms.onrender.com` with no trailing slash; set this same value in both Vercel projects/domains |
 
 Redeploy/rebuild the frontend after setting it because `NEXT_PUBLIC_*` values are embedded into the browser bundle at build time.
 
-The backend allows the production frontend origin `https://ip-clms.vercel.app`, project preview origins matching `https://ip-clms-*.vercel.app`, and local development by default. For a custom frontend domain, set backend `APP_ORIGIN` to that exact origin, including scheme, for example:
+The backend allows the production frontend origins `https://ip-clms.vercel.app` and `https://clms.shreyashvishwakarma.in`, project preview origins matching `https://ip-clms-*.vercel.app`, and local development by default. Both production frontends should point `NEXT_PUBLIC_API_URL` to the same Render backend. After changing the CORS configuration, redeploy the backend. For any other custom frontend domain, set backend `APP_ORIGIN` to that exact origin, including scheme, for example:
 
 ```text
 APP_ORIGIN=https://clms-team.vercel.app
