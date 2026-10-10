@@ -6,6 +6,7 @@ import com.metropolis.lab.equipment.EquipmentStatus;
 import com.metropolis.lab.user.User;
 import com.metropolis.lab.user.UserRepository;
 import com.metropolis.lab.notification.NotificationService;
+import com.metropolis.lab.transaction.TransactionRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -26,12 +27,14 @@ public class MaintenanceController {
   private final EquipmentRepository equipment;
   private final UserRepository users;
   private final NotificationService notifications;
+  private final TransactionRepository transactions;
 
-  public MaintenanceController(MaintenanceTicketRepository tickets, EquipmentRepository equipment, UserRepository users, NotificationService notifications) {
+  public MaintenanceController(MaintenanceTicketRepository tickets, EquipmentRepository equipment, UserRepository users, NotificationService notifications, TransactionRepository transactions) {
     this.tickets = tickets;
     this.equipment = equipment;
     this.users = users;
     this.notifications = notifications;
+    this.transactions = transactions;
   }
 
   @GetMapping
@@ -78,14 +81,22 @@ public class MaintenanceController {
     MaintenanceTicket saved = tickets.save(ticket);
     Equipment item = equipment.findById(ticket.getEquipmentId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
     if ("RESOLVED".equals(request.status()) && !tickets.existsByEquipmentIdAndStatusNot(item.getId(), "RESOLVED")) {
-      if (item.getStatus() == EquipmentStatus.MAINTENANCE) item.setStatus(EquipmentStatus.AVAILABLE);
+      if (item.getStatus() == EquipmentStatus.MAINTENANCE) {
+        item.setStatus(transactions.existsByEquipmentIdAndReturnedAtIsNull(item.getId()) ? EquipmentStatus.IN_USE : EquipmentStatus.AVAILABLE);
+      }
     } else if (!"RESOLVED".equals(request.status())) {
       item.setStatus(EquipmentStatus.MAINTENANCE);
     }
     equipment.save(item);
     if ("RESOLVED".equals(request.status())) {
+      String statusMessage = switch (item.getStatus()) {
+        case AVAILABLE -> item.getName() + " has completed maintenance and is available again.";
+        case IN_USE -> item.getName() + " has completed maintenance and remains checked out until its active loan is returned.";
+        case MAINTENANCE -> item.getName() + " has one resolved ticket but remains unavailable because other maintenance is still open.";
+        case RETIRED -> item.getName() + " has completed maintenance but remains retired.";
+      };
       users.findAll().stream().filter(account -> "MEMBER".equals(account.getRole())).forEach(account ->
-        notifications.create(account.getId(), "Maintenance completed", item.getName() + " is available again.")
+        notifications.create(account.getId(), "Maintenance completed", statusMessage)
       );
     }
     return saved;

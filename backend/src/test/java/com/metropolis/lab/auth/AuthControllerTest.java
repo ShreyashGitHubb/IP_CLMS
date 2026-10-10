@@ -298,6 +298,51 @@ class AuthControllerTest {
   }
 
   @Test
+  void equipmentWithHistoryCannotBeDeletedButCanBeRetired() throws Exception {
+    User admin = createAdmin("equipment-retire-admin@example.edu");
+    String adminToken = authTokenService.issue(admin);
+    jdbcTemplate.update("INSERT INTO equipment (name, category, asset_tag, status, location) VALUES (?, ?, ?, ?, ?)", "Tracked Microscope", "Microscopy", "RETIRE-HISTORY-1", "IN_USE", "Lab A");
+    Long equipmentId = jdbcTemplate.queryForObject("SELECT id FROM equipment WHERE asset_tag = ?", Long.class, "RETIRE-HISTORY-1");
+    jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, admin.getId(), "BORROW");
+
+    mockMvc.perform(delete("/api/equipment/{id}", equipmentId).header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isConflict())
+      .andExpect(jsonPath("$.error").value("Equipment has linked requests, loans, or maintenance history and cannot be deleted. Retire it to preserve its records."));
+
+    mockMvc.perform(put("/api/equipment/{id}", equipmentId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"name\":\"Tracked Microscope\",\"category\":\"Microscopy\",\"assetTag\":\"RETIRE-HISTORY-1\",\"status\":\"RETIRED\",\"location\":\"Lab A\"}"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.status").value("RETIRED"));
+    org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM transactions WHERE equipment_id = ?", Integer.class, equipmentId));
+  }
+
+  @Test
+  void resolvingMaintenanceDoesNotMakeEquipmentAvailableWhileLoanIsActive() throws Exception {
+    User admin = createAdmin("maintenance-loan-admin@example.edu");
+    String adminToken = authTokenService.issue(admin);
+    jdbcTemplate.update("INSERT INTO equipment (name, category, asset_tag, status, location) VALUES (?, ?, ?, ?, ?)", "Loaned Repair Scope", "Test", "MAINTENANCE-LOAN-1", "AVAILABLE", "Lab");
+    Long equipmentId = jdbcTemplate.queryForObject("SELECT id FROM equipment WHERE asset_tag = ?", Long.class, "MAINTENANCE-LOAN-1");
+    jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, admin.getId(), "BORROW");
+
+    String ticketResponse = mockMvc.perform(post("/api/maintenance")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(java.util.Map.of("equipmentId", equipmentId, "title", "Cable repair", "details", "Replace damaged power cable"))))
+      .andExpect(status().isCreated())
+      .andReturn().getResponse().getContentAsString();
+    Long ticketId = objectMapper.readTree(ticketResponse).get("id").asLong();
+
+    mockMvc.perform(patch("/api/maintenance/{id}", ticketId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"status\":\"RESOLVED\"}"))
+      .andExpect(status().isOk());
+    org.junit.jupiter.api.Assertions.assertEquals("IN_USE", jdbcTemplate.queryForObject("SELECT status FROM equipment WHERE id = ?", String.class, equipmentId));
+  }
+
+  @Test
   void memberCanCancelOnlyOwnPendingRequest() throws Exception {
     String memberToken = registerMember("Request Member", "request-member@example.edu");
     Long memberId = userRepository.findByEmailIgnoreCase("request-member@example.edu").orElseThrow().getId();

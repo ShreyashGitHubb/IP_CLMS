@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useState } from 'react'
-import { Check, Edit2, Plus, Search, Trash2, X } from 'lucide-react'
+import { Archive, Check, Edit2, Plus, Search, Trash2, X } from 'lucide-react'
 import { WorkspaceShell } from '@/components/workspace-shell'
 import { apiRequest, type EquipmentItem } from '@/lib/clms-api'
 import { getSession } from '@/lib/auth'
@@ -89,6 +89,21 @@ export default function EquipmentPage() {
     }
   }
 
+  const retireEquipment = async (item: EquipmentItem) => {
+    if (!window.confirm(`Retire ${item.name}? Its history will remain available, but members can no longer request it.`)) return
+    setError('')
+    try {
+      await apiRequest<EquipmentItem>(`/api/equipment/${item.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...item, status: 'RETIRED' }),
+      })
+      setNotice(`${item.name} retired; its records were preserved.`)
+      refresh()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not retire equipment.')
+    }
+  }
+
   const submitRequest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!requestItem) return
@@ -128,7 +143,7 @@ export default function EquipmentPage() {
     {loading ? <p className="py-12 text-center text-[10px] text-[#85858e]">Loading equipment from the lab database…</p> : visibleItems.length === 0 ? <p className="border border-dashed border-white/10 py-12 text-center text-[10px] text-[#85858e]">No equipment matches this view.</p> : <div className="grid gap-2.5 md:grid-cols-2">
       {visibleItems.map((item) => <article key={item.id} className="border border-white/10 bg-[#1b1b1d] p-3.5">
         <div className="mb-4 flex items-start justify-between gap-3"><div className="min-w-0"><div className="font-mono text-[7px] uppercase tracking-[0.16em] text-[#777780]">{item.category}</div><h2 className="mt-1 truncate text-[13px] font-medium">{item.name}</h2><div className="mt-1 font-mono text-[7px] uppercase text-[#777780]">{item.assetTag} · {item.location}</div></div>
-          {isAdmin ? <div className="flex gap-1"><button onClick={() => openEdit(item)} aria-label={`Edit ${item.name}`} className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#999] hover:text-white"><Edit2 className="h-3 w-3" /></button><button onClick={() => deleteEquipment(item)} aria-label={`Delete ${item.name}`} className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#999] hover:text-red-300"><Trash2 className="h-3 w-3" /></button></div> : null}
+          {isAdmin ? <div className="flex gap-1">{item.status !== 'RETIRED' ? <button onClick={() => retireEquipment(item)} aria-label={`Retire ${item.name}`} title="Retire and preserve history" className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#999] hover:text-amber-200"><Archive className="h-3 w-3" /></button> : null}<button onClick={() => openEdit(item)} aria-label={`Edit ${item.name}`} className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#999] hover:text-white"><Edit2 className="h-3 w-3" /></button><button onClick={() => deleteEquipment(item)} aria-label={`Delete ${item.name}`} title="Delete only if unused" className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#999] hover:text-red-300"><Trash2 className="h-3 w-3" /></button></div> : null}
         </div>
         <div className="flex items-center justify-between border-t border-white/10 pt-3"><span className={`font-mono text-[8px] uppercase tracking-[0.12em] ${item.status === 'AVAILABLE' ? 'text-emerald-300' : item.status === 'MAINTENANCE' ? 'text-amber-300' : 'text-[#b9a4ff]'}`}>● {item.status.replaceAll('_', ' ')}</span>{!isAdmin && item.status === 'AVAILABLE' ? <button onClick={() => setRequestItem(item)} className="border border-[#9a80ff]/60 px-2.5 py-1 text-[8px] uppercase tracking-[0.1em] text-[#c5b6ff] hover:bg-[#9a80ff]/10">Request item</button> : null}</div>
       </article>)}

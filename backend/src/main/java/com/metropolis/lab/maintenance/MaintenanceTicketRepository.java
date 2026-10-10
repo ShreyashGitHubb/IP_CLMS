@@ -5,5 +5,6 @@ import java.util.List;
 
 public interface MaintenanceTicketRepository extends JpaRepository<MaintenanceTicket, Long> {
   List<MaintenanceTicket> findAllByOrderByOpenedAtDesc();
+  boolean existsByEquipmentId(Long equipmentId);
   boolean existsByEquipmentIdAndStatusNot(Long equipmentId, String status);
 }

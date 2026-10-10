@@ -5,5 +5,7 @@ import java.util.List;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
   List<Transaction> findAllByUserId(Long userId);
+  boolean existsByEquipmentId(Long equipmentId);
+  boolean existsByEquipmentIdAndReturnedAtIsNull(Long equipmentId);
   boolean existsByUserIdAndReturnedAtIsNull(Long userId);
 }
