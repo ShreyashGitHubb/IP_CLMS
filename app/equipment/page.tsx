@@ -28,6 +28,13 @@ export default function EquipmentPage() {
   const [requestDueAt, setRequestDueAt] = useState('')
   const [working, setWorking] = useState(false)
   const [notice, setNotice] = useState('')
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string
+    detail?: string
+    confirmLabel: string
+    danger?: boolean
+    onConfirm: () => void
+  } | null>(null)
 
   const refresh = (isInitial = false) => {
     if (isInitial) setLoading(true)
@@ -80,44 +87,76 @@ export default function EquipmentPage() {
     }
   }
 
-  const deleteEquipment = async (item: EquipmentItem) => {
-    if (!window.confirm(`Delete ${item.name}? This will remove the equipment from the lab catalog.`)) return
-    setError('')
-    try {
-      await apiRequest<void>(`/api/equipment/${item.id}`, { method: 'DELETE' })
-      setNotice(`Deleted ${item.name}.`)
-      refresh(false)
-    } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 409) {
-        if (window.confirm(`${item.name} has linked history (requests, loans, or maintenance records). Force delete this equipment and permanently remove all its linked records?`)) {
+  const deleteEquipment = (item: EquipmentItem) => {
+    setConfirmDialog({
+      title: `Delete "${item.name}"?`,
+      detail: 'This permanently removes the equipment from the lab catalog. If the item has linked loans or history, you will be prompted again.',
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: () => {
+        setConfirmDialog(null)
+        setError('')
+        void (async () => {
           try {
-            await apiRequest<void>(`/api/equipment/${item.id}?force=true`, { method: 'DELETE' })
-            setNotice(`Permanently deleted ${item.name} and its linked history.`)
+            await apiRequest<void>(`/api/equipment/${item.id}`, { method: 'DELETE' })
+            setNotice(`Deleted ${item.name}.`)
             refresh(false)
-            return
-          } catch (forceCause) {
-            setError(forceCause instanceof Error ? forceCause.message : 'Could not force delete equipment.')
-            return
+          } catch (cause) {
+            if (cause instanceof ApiError && cause.status === 409) {
+              // Linked records exist — ask for force delete via React modal (not window.confirm)
+              setConfirmDialog({
+                title: `"${item.name}" has linked history`,
+                detail:
+                  'This equipment has linked loan transactions, requests, or maintenance records. ' +
+                  'Force deleting will permanently remove ALL associated records. This cannot be undone.',
+                confirmLabel: 'Force Delete Everything',
+                danger: true,
+                onConfirm: () => {
+                  setConfirmDialog(null)
+                  setError('')
+                  void (async () => {
+                    try {
+                      await apiRequest<void>(`/api/equipment/${item.id}?force=true`, { method: 'DELETE' })
+                      setNotice(`Permanently deleted "${item.name}" and all its linked records.`)
+                      refresh(false)
+                    } catch (forceCause) {
+                      setError(forceCause instanceof Error ? forceCause.message : 'Force delete failed.')
+                    }
+                  })()
+                },
+              })
+            } else {
+              setError(cause instanceof Error ? cause.message : 'Could not delete equipment.')
+            }
           }
-        }
-      }
-      setError(cause instanceof Error ? cause.message : 'Could not delete equipment.')
-    }
+        })()
+      },
+    })
   }
 
-  const retireEquipment = async (item: EquipmentItem) => {
-    if (!window.confirm(`Retire ${item.name}? Its history will remain available, but members can no longer request it.`)) return
-    setError('')
-    try {
-      await apiRequest<EquipmentItem>(`/api/equipment/${item.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ ...item, status: 'RETIRED' }),
-      })
-      setNotice(`${item.name} retired; its records were preserved.`)
-      refresh(false)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not retire equipment.')
-    }
+  const retireEquipment = (item: EquipmentItem) => {
+    setConfirmDialog({
+      title: `Retire "${item.name}"?`,
+      detail: 'Its loan history and maintenance records will be preserved, but members will no longer be able to request it.',
+      confirmLabel: 'Retire Equipment',
+      danger: false,
+      onConfirm: () => {
+        setConfirmDialog(null)
+        setError('')
+        void (async () => {
+          try {
+            await apiRequest<EquipmentItem>(`/api/equipment/${item.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ ...item, status: 'RETIRED' }),
+            })
+            setNotice(`${item.name} retired; its records were preserved.`)
+            refresh(false)
+          } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'Could not retire equipment.')
+          }
+        })()
+      },
+    })
   }
 
   const submitRequest = async (event: FormEvent<HTMLFormElement>) => {
@@ -169,6 +208,41 @@ export default function EquipmentPage() {
 
     {selectedQrItem ? (
       <AssetLabelModal item={selectedQrItem} onClose={() => setSelectedQrItem(null)} />
+    ) : null}
+
+    {/* Confirmation dialog — replaces window.confirm() which Chrome suppresses on inactive tabs */}
+    {confirmDialog ? (
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmDialog(null) }}
+      >
+        <div className="w-full max-w-sm border border-white/10 bg-[#1b1b1d] p-5 shadow-2xl">
+          <h3 className="text-sm font-semibold text-white">{confirmDialog.title}</h3>
+          {confirmDialog.detail && (
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{confirmDialog.detail}</p>
+          )}
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmDialog(null)}
+              className="h-8 border border-white/15 px-4 text-[9px] uppercase tracking-wider text-slate-300 hover:bg-white/5"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDialog.onConfirm}
+              className={`h-8 px-4 text-[9px] font-semibold uppercase tracking-wider text-white ${
+                confirmDialog.danger ? 'bg-red-600 hover:bg-red-500' : 'bg-amber-600 hover:bg-amber-500'
+              }`}
+            >
+              {confirmDialog.confirmLabel}
+            </button>
+          </div>
+        </div>
+      </div>
     ) : null}
   </WorkspaceShell>
 }
