@@ -254,7 +254,7 @@ export function generateQrSvg(text: string, options: { size?: number; margin?: n
     }
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" shape-rendering="crispEdges">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="100%" height="100%" style="display:block;max-width:100%;max-height:100%;" shape-rendering="crispEdges">
     ${background !== 'transparent' && background !== '#00000000' ? `<rect width="${size}" height="${size}" fill="${background}" />` : ''}
     <path d="${pathData}" fill="${color}" />
   </svg>`

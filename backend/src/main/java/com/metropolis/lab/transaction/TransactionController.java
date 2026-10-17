@@ -26,8 +26,11 @@ public class TransactionController {
   @ResponseStatus(HttpStatus.CREATED)
   @Transactional
   public Transaction create(@Valid @RequestBody Transaction transaction, @RequestAttribute("currentUser") User currentUser){
-    if (!"ADMIN".equals(currentUser.getRole())) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access is required.");
+    // Admins can create transactions for any user.
+    // Non-admin members can only create a transaction assigned to themselves (self-checkout via kiosk).
+    boolean isAdmin = "ADMIN".equals(currentUser.getRole());
+    if (!isAdmin && !currentUser.getId().equals(transaction.getUserId())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only check out equipment to your own account.");
     }
     Equipment item = equipmentRepository.findById(transaction.getEquipmentId())
       .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
