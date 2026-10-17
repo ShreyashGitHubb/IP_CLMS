@@ -13,6 +13,7 @@ import {
   LogOut,
   Bell,
   Menu,
+  ScanLine,
   Settings2,
   ShieldCheck,
   Users,
@@ -30,6 +31,7 @@ const sections = [
     { label: 'Notifications', href: '/notifications', icon: Bell },
   ] },
   { group: 'Operate', items: [
+    { label: 'Kiosk scan', href: '/kiosk', icon: ScanLine },
     { label: 'Maintenance', href: '/maintenance', icon: Wrench, admin: true },
     { label: 'Students', href: '/students', icon: Users, admin: true },
     { label: 'Calendar', href: '/calendar', icon: CalendarDays },

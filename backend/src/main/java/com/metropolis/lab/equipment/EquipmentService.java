@@ -16,9 +16,10 @@ public class EquipmentService {
   private final TransactionRepository transactions;
   private final MaintenanceTicketRepository maintenanceTickets;
   public EquipmentService(EquipmentRepository repository, EquipmentRequestRepository requests, TransactionRepository transactions, MaintenanceTicketRepository maintenanceTickets){this.repository=repository; this.requests=requests; this.transactions=transactions; this.maintenanceTickets=maintenanceTickets;}
-  public List<Equipment> list(){return repository.findAll();}
-  public Equipment get(Long id){return repository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Equipment not found: " + id));}
-  public Equipment create(Equipment equipment){return repository.save(equipment);}
+  public List<Equipment> list() { return repository.findAll(); }
+  public Equipment get(Long id) { return repository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Equipment not found: " + id)); }
+  public Equipment findByTag(String tag) { return repository.findByAssetTag(tag).orElseThrow(() -> new ResourceNotFoundException("Equipment not found with tag: " + tag)); }
+  public Equipment create(Equipment equipment) { return repository.save(equipment); }
   public Equipment update(Long id, Equipment input){
     Equipment current=get(id);
     if (input.getStatus() == EquipmentStatus.AVAILABLE

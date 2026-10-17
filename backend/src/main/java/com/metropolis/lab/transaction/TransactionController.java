@@ -22,9 +22,21 @@ public class TransactionController {
       ? repository.findAll()
       : repository.findAllByUserId(currentUser.getId());
   }
-  @PostMapping @ResponseStatus(HttpStatus.CREATED) public Transaction create(@Valid @RequestBody Transaction transaction, @RequestAttribute("currentUser") User currentUser){
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  @Transactional
+  public Transaction create(@Valid @RequestBody Transaction transaction, @RequestAttribute("currentUser") User currentUser){
     if (!"ADMIN".equals(currentUser.getRole())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access is required.");
+    }
+    Equipment item = equipmentRepository.findById(transaction.getEquipmentId())
+      .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
+    if (item.getStatus() != EquipmentStatus.AVAILABLE && !"RETURN".equalsIgnoreCase(transaction.getAction())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Equipment is not available for checkout.");
+    }
+    if (!"RETURN".equalsIgnoreCase(transaction.getAction())) {
+      item.setStatus(EquipmentStatus.IN_USE);
+      equipmentRepository.save(item);
     }
     return repository.save(transaction);
   }
