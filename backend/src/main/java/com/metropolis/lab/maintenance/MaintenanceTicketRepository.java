@@ -7,4 +7,5 @@ public interface MaintenanceTicketRepository extends JpaRepository<MaintenanceTi
   List<MaintenanceTicket> findAllByOrderByOpenedAtDesc();
   boolean existsByEquipmentId(Long equipmentId);
   boolean existsByEquipmentIdAndStatusNot(Long equipmentId, String status);
+  void deleteByEquipmentId(Long equipmentId);
 }

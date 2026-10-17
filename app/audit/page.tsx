@@ -15,6 +15,7 @@ export default function AuditPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (entries.length === 0) setLoading(true)
     apiRequest<AuditEntry[]>('/api/audit-logs')
       .then(setEntries)
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load audit entries.'))

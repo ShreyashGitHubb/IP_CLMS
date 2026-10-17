@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Archive, Check, Edit2, Plus, Search, Trash2, X } from 'lucide-react'
 import { WorkspaceShell } from '@/components/workspace-shell'
-import { apiRequest, type EquipmentItem } from '@/lib/clms-api'
+import { ApiError, apiRequest, type EquipmentItem } from '@/lib/clms-api'
 import { getSession } from '@/lib/auth'
 import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 
@@ -26,8 +26,8 @@ export default function EquipmentPage() {
   const [working, setWorking] = useState(false)
   const [notice, setNotice] = useState('')
 
-  const refresh = () => {
-    setLoading(true)
+  const refresh = (isInitial = false) => {
+    if (isInitial) setLoading(true)
     apiRequest<EquipmentItem[]>('/api/equipment')
       .then(setItems)
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load equipment.'))
@@ -41,7 +41,7 @@ export default function EquipmentPage() {
       setFormOpen(true)
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
     }
-    refresh()
+    refresh(items.length === 0)
   }, [liveRevision])
 
   const visibleItems = items.filter((item) => {
@@ -69,7 +69,7 @@ export default function EquipmentPage() {
       setEditing(null)
       setFormOpen(false)
       setNotice(editing ? 'Equipment updated.' : 'Equipment added.')
-      refresh()
+      refresh(false)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save equipment.')
     } finally {
@@ -78,13 +78,26 @@ export default function EquipmentPage() {
   }
 
   const deleteEquipment = async (item: EquipmentItem) => {
-    if (!window.confirm(`Delete ${item.name}?`)) return
+    if (!window.confirm(`Delete ${item.name}? This will remove the equipment from the lab catalog.`)) return
     setError('')
     try {
       await apiRequest<void>(`/api/equipment/${item.id}`, { method: 'DELETE' })
-      setNotice('Equipment deleted.')
-      refresh()
+      setNotice(`Deleted ${item.name}.`)
+      refresh(false)
     } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        if (window.confirm(`${item.name} has linked history (requests, loans, or maintenance records). Force delete this equipment and permanently remove all its linked records?`)) {
+          try {
+            await apiRequest<void>(`/api/equipment/${item.id}?force=true`, { method: 'DELETE' })
+            setNotice(`Permanently deleted ${item.name} and its linked history.`)
+            refresh(false)
+            return
+          } catch (forceCause) {
+            setError(forceCause instanceof Error ? forceCause.message : 'Could not force delete equipment.')
+            return
+          }
+        }
+      }
       setError(cause instanceof Error ? cause.message : 'Could not delete equipment.')
     }
   }
@@ -98,7 +111,7 @@ export default function EquipmentPage() {
         body: JSON.stringify({ ...item, status: 'RETIRED' }),
       })
       setNotice(`${item.name} retired; its records were preserved.`)
-      refresh()
+      refresh(false)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not retire equipment.')
     }

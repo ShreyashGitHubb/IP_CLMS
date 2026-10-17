@@ -8,4 +8,5 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
   boolean existsByEquipmentId(Long equipmentId);
   boolean existsByEquipmentIdAndReturnedAtIsNull(Long equipmentId);
   boolean existsByUserIdAndReturnedAtIsNull(Long userId);
+  void deleteByEquipmentId(Long equipmentId);
 }

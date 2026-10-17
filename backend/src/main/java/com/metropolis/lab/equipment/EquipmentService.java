@@ -28,10 +28,21 @@ public class EquipmentService {
     current.setName(input.getName()); current.setCategory(input.getCategory()); current.setAssetTag(input.getAssetTag());
     current.setStatus(input.getStatus()); current.setLocation(input.getLocation()); current.setDescription(input.getDescription()); return repository.save(current);
   }
-  public void delete(Long id){
+  public void delete(Long id) {
+    delete(id, false);
+  }
+
+  @org.springframework.transaction.annotation.Transactional
+  public void delete(Long id, boolean force) {
     Equipment equipment = get(id);
-    if (requests.existsByEquipmentId(id) || transactions.existsByEquipmentId(id) || maintenanceTickets.existsByEquipmentId(id)) {
+    boolean hasRelations = requests.existsByEquipmentId(id) || transactions.existsByEquipmentId(id) || maintenanceTickets.existsByEquipmentId(id);
+    if (hasRelations && !force) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Equipment has linked requests, loans, or maintenance history and cannot be deleted. Retire it to preserve its records.");
+    }
+    if (hasRelations && force) {
+      maintenanceTickets.deleteByEquipmentId(id);
+      requests.deleteByEquipmentId(id);
+      transactions.deleteByEquipmentId(id);
     }
     repository.delete(equipment);
   }

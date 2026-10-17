@@ -24,6 +24,7 @@ export default function TransactionsPage() {
     const admin = session.user.role === 'ADMIN'
     setIsAdmin(admin)
     setUserId(session.user.id)
+    if (transactions.length === 0) setLoading(true)
     const fetches: Promise<unknown>[] = [apiRequest<LoanTransaction[]>('/api/transactions'), apiRequest<EquipmentItem[]>('/api/equipment')]
     if (admin) fetches.push(apiRequest<LabUser[]>('/api/users'))
     Promise.all(fetches)

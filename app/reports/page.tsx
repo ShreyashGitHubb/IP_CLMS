@@ -17,6 +17,7 @@ export default function ReportsPage() {
   const [to, setTo] = useState('')
 
   useEffect(() => {
+    if (transactions.length === 0 && equipment.length === 0) setLoading(true)
     Promise.all([apiRequest<EquipmentItem[]>('/api/equipment'), apiRequest<LoanTransaction[]>('/api/transactions'), apiRequest<LabUser[]>('/api/users')])
       .then(([items, rows, labUsers]) => { setEquipment(items); setTransactions(rows); setUsers(labUsers) })
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load report data.'))

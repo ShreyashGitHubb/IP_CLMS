@@ -22,6 +22,7 @@ export default function MaintenancePage() {
       setFormOpen(true)
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
     }
+    if (tickets.length === 0) setLoading(true)
     Promise.all([apiRequest<EquipmentItem[]>('/api/equipment'), apiRequest<MaintenanceTicket[]>('/api/maintenance')])
       .then(([equipment, maintenance]) => { setItems(equipment); setTickets(maintenance) })
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load inventory.'))

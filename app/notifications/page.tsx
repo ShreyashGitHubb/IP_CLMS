@@ -12,7 +12,13 @@ export default function NotificationsPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  const refresh = () => apiRequest<NotificationItem[]>('/api/notifications').then(setItems).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load notifications.')).finally(() => setLoading(false))
+  const refresh = () => {
+    if (items.length === 0) setLoading(true)
+    return apiRequest<NotificationItem[]>('/api/notifications')
+      .then(setItems)
+      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load notifications.'))
+      .finally(() => setLoading(false))
+  }
   useEffect(() => { void refresh() }, [liveRevision])
 
   const markRead = async (id?: number) => {

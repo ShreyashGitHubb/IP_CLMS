@@ -8,4 +8,5 @@ public interface EquipmentRequestRepository extends JpaRepository<EquipmentReque
   List<EquipmentRequest> findAllByOrderByCreatedAtDesc();
   boolean existsByEquipmentId(Long equipmentId);
   boolean existsByUserIdAndEquipmentIdAndStatus(Long userId, Long equipmentId, String status);
+  void deleteByEquipmentId(Long equipmentId);
 }

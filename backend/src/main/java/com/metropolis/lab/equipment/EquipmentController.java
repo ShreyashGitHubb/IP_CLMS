@@ -16,7 +16,7 @@ public class EquipmentController {
   @GetMapping("/{id}") public Equipment get(@PathVariable Long id){return service.get(id);}
   @PostMapping @ResponseStatus(HttpStatus.CREATED) public Equipment create(@Valid @RequestBody Equipment equipment, @RequestAttribute("currentUser") User user){requireAdmin(user); return service.create(equipment);}
   @PutMapping("/{id}") public Equipment update(@PathVariable Long id, @Valid @RequestBody Equipment equipment, @RequestAttribute("currentUser") User user){requireAdmin(user); return service.update(id, equipment);}
-  @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void delete(@PathVariable Long id, @RequestAttribute("currentUser") User user){requireAdmin(user); service.delete(id);}
+  @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void delete(@PathVariable Long id, @RequestParam(value = "force", defaultValue = "false") boolean force, @RequestAttribute("currentUser") User user){requireAdmin(user); service.delete(id, force);}
 
   private void requireAdmin(User user) {
     if (!"ADMIN".equals(user.getRole())) {

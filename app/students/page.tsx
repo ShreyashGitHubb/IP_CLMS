@@ -27,6 +27,7 @@ export default function StudentsPage() {
       setFormOpen(true)
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
     }
+    if (users.length === 0) setLoading(true)
     apiRequest<LabUser[]>('/api/users')
       .then(setUsers)
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load users.'))

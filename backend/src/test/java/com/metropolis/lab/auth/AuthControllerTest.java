@@ -319,6 +319,23 @@ class AuthControllerTest {
   }
 
   @Test
+  void equipmentWithHistoryCanBeForceDeleted() throws Exception {
+    User admin = createAdmin("equipment-force-delete-admin@example.edu");
+    String adminToken = authTokenService.issue(admin);
+    jdbcTemplate.update("INSERT INTO equipment (name, category, asset_tag, status, location) VALUES (?, ?, ?, ?, ?)", "Force Delete Scope", "Microscopy", "FORCE-DELETE-1", "AVAILABLE", "Lab B");
+    Long equipmentId = jdbcTemplate.queryForObject("SELECT id FROM equipment WHERE asset_tag = ?", Long.class, "FORCE-DELETE-1");
+    jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, admin.getId(), "BORROW");
+
+    mockMvc.perform(delete("/api/equipment/{id}", equipmentId)
+        .param("force", "true")
+        .header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isNoContent());
+
+    org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM equipment WHERE id = ?", Integer.class, equipmentId));
+    org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM transactions WHERE equipment_id = ?", Integer.class, equipmentId));
+  }
+
+  @Test
   void resolvingMaintenanceDoesNotMakeEquipmentAvailableWhileLoanIsActive() throws Exception {
     User admin = createAdmin("maintenance-loan-admin@example.edu");
     String adminToken = authTokenService.issue(admin);

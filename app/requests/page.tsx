@@ -20,6 +20,7 @@ export default function RequestsPage() {
   useEffect(() => {
     const admin = getSession()?.user.role === 'ADMIN'
     setIsAdmin(admin)
+    if (requests.length === 0) setLoading(true)
     const fetches: Promise<unknown>[] = [
       apiRequest<EquipmentRequest[]>('/api/requests'),
       apiRequest<EquipmentItem[]>('/api/equipment'),

@@ -20,39 +20,61 @@ function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
+const updateSubscribers = new Set<() => void>()
+let sharedAbortController: AbortController | null = null
+let sharedRetryTimer = 0
+let isStreamActive = false
+let streamConnectionInProgress = false
+let disconnectCleanupTimer = 0
+let notifyDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let lastHiddenTime = 0
+let isVisibilityListenerAttached = false
+
+function triggerSubscribers() {
+  if (notifyDebounceTimer) clearTimeout(notifyDebounceTimer)
+  notifyDebounceTimer = setTimeout(() => {
+    GET_CACHE.clear()
+    IN_FLIGHT_GETS.clear()
+    updateSubscribers.forEach((callback) => {
+      try {
+        callback()
+      } catch (error) {
+        console.error('Error invoking CLMS update subscriber:', error)
+      }
+    })
+  }, 300)
+}
+
 function notifyDataChanged(broadcast: boolean) {
   if (typeof window === 'undefined') return
-  GET_CACHE.clear()
-  IN_FLIGHT_GETS.clear()
-  window.dispatchEvent(new Event('clms:data-change'))
+  triggerSubscribers()
   if (broadcast && typeof BroadcastChannel !== 'undefined') {
-    updateChannel ??= new BroadcastChannel('clms:data-updates')
-    updateChannel.postMessage('changed')
+    try {
+      updateChannel ??= new BroadcastChannel('clms:data-updates')
+      updateChannel.postMessage('changed')
+    } catch {
+      // BroadcastChannel might not be supported in some environments
+    }
   }
 }
 
-export function subscribeToApiUpdates(onUpdate: () => void) {
-  if (typeof window === 'undefined') return () => undefined
-
+async function startSharedStream() {
+  if (typeof window === 'undefined' || isStreamActive || streamConnectionInProgress) return
   const session = getSession()
-  if (!session) return () => undefined
+  if (!session) return
 
-  const controller = new AbortController()
-  let retryTimer = 0
+  streamConnectionInProgress = true
+  sharedAbortController = new AbortController()
+  const signal = sharedAbortController.signal
   let retryDelay = 1000
-  let disposed = false
-  const refreshWhenVisible = () => { if (document.visibilityState === 'visible') onUpdate() }
-  const onStorageUpdate = (event: MessageEvent) => {
-    if (event.data === 'changed') notifyDataChanged(false)
-  }
 
-  const connect = async () => {
-    while (!disposed) {
+  const run = async () => {
+    while (updateSubscribers.size > 0 && !signal.aborted) {
       try {
         const response = await fetch(`${getApiBaseUrl()}/api/stream`, {
           headers: { Authorization: `Bearer ${session.token}`, Accept: 'text/event-stream' },
           cache: 'no-store',
-          signal: controller.signal,
+          signal,
         })
         if (response.status === 401) {
           clearSession()
@@ -61,49 +83,99 @@ export function subscribeToApiUpdates(onUpdate: () => void) {
         }
         if (!response.ok || !response.body) throw new Error('Live update stream unavailable.')
 
+        isStreamActive = true
         retryDelay = 1000
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
-        while (!disposed) {
+
+        while (updateSubscribers.size > 0 && !signal.aborted) {
           const { done, value } = await reader.read()
           if (done) break
           buffer += decoder.decode(value, { stream: true })
           const events = buffer.split('\n\n')
           buffer = events.pop() ?? ''
           if (events.some((event) => event.includes('event:update') || event.includes('event: update'))) {
-            notifyDataChanged(false)
+            triggerSubscribers()
           }
         }
       } catch (error) {
-        if (disposed || (error instanceof Error && error.name === 'AbortError')) return
+        if (signal.aborted) return
+      } finally {
+        isStreamActive = false
       }
 
-      if (disposed) return
+      if (updateSubscribers.size === 0 || signal.aborted) return
       await new Promise<void>((resolve) => {
-        retryTimer = window.setTimeout(resolve, retryDelay)
+        sharedRetryTimer = window.setTimeout(resolve, retryDelay)
       })
       retryDelay = Math.min(retryDelay * 2, 30000)
     }
   }
 
-  void connect()
-  window.addEventListener('focus', refreshWhenVisible)
-  window.addEventListener('clms:data-change', onUpdate)
-  document.addEventListener('visibilitychange', refreshWhenVisible)
+  void run()
+  streamConnectionInProgress = false
+}
+
+function attachGlobalListenersOnce() {
+  if (typeof window === 'undefined' || isVisibilityListenerAttached) return
+  isVisibilityListenerAttached = true
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      lastHiddenTime = Date.now()
+    } else if (document.visibilityState === 'visible') {
+      const wasHiddenLong = Date.now() - lastHiddenTime > 45000
+      if (wasHiddenLong || !isStreamActive) {
+        triggerSubscribers()
+        if (!isStreamActive && updateSubscribers.size > 0) {
+          void startSharedStream()
+        }
+      }
+    }
+  })
+
   if (typeof BroadcastChannel !== 'undefined') {
-    updateChannel ??= new BroadcastChannel('clms:data-updates')
-    updateChannel.addEventListener('message', onStorageUpdate)
+    try {
+      updateChannel ??= new BroadcastChannel('clms:data-updates')
+      updateChannel.onmessage = (event: MessageEvent) => {
+        if (event.data === 'changed') {
+          triggerSubscribers()
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  }
+}
+
+export function subscribeToApiUpdates(onUpdate: () => void) {
+  if (typeof window === 'undefined') return () => undefined
+  const session = getSession()
+  if (!session) return () => undefined
+
+  updateSubscribers.add(onUpdate)
+  attachGlobalListenersOnce()
+
+  if (disconnectCleanupTimer) {
+    window.clearTimeout(disconnectCleanupTimer)
+    disconnectCleanupTimer = 0
   }
 
+  void startSharedStream()
+
   return () => {
-    disposed = true
-    controller.abort()
-    window.clearTimeout(retryTimer)
-    window.removeEventListener('focus', refreshWhenVisible)
-    window.removeEventListener('clms:data-change', onUpdate)
-    document.removeEventListener('visibilitychange', refreshWhenVisible)
-    updateChannel?.removeEventListener('message', onStorageUpdate)
+    updateSubscribers.delete(onUpdate)
+    if (updateSubscribers.size === 0) {
+      disconnectCleanupTimer = window.setTimeout(() => {
+        if (updateSubscribers.size === 0) {
+          sharedAbortController?.abort()
+          sharedAbortController = null
+          isStreamActive = false
+          window.clearTimeout(sharedRetryTimer)
+        }
+      }, 5000)
+    }
   }
 }
 

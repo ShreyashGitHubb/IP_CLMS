@@ -27,6 +27,7 @@ export default function CalendarPage() {
       setFormOpen(true)
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
     }
+    if (events.length === 0 && transactions.length === 0) setLoading(true)
     Promise.all([apiRequest<LoanTransaction[]>('/api/transactions'), apiRequest<EquipmentItem[]>('/api/equipment'), apiRequest<LabEvent[]>('/api/events')])
       .then(([rows, items, labEvents]) => { setTransactions(rows); setEquipment(items); setEvents(labEvents) })
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Could not load due dates.'))
