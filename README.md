@@ -226,6 +226,43 @@ Every error uses one shape, so the frontend can show the reason instead of a bar
 
 Validation failures add a `fields` map, and duplicate-key database errors add their own message. Earlier revisions answered a conflict with only `{"status":409,"error":"Conflict"}`, so the reason a request was refused never reached the screen.
 
+### Concurrency control
+
+Equipment can be written by two administrators in two tabs, or by two members scanning the same asset at the same moment. Two mechanisms keep that from producing a double loan.
+
+**Pessimistic locking (atomic issue and return).** `TransactionService` reads the equipment row with `SELECT ... FOR UPDATE` (`@Lock(PESSIMISTIC_WRITE)`) before deciding, so issuing and returning are strictly serialized at the database row. The second writer waits for the first to commit, then reads the status that was just committed and is answered with `409` instead of creating a second loan. Request approval and cancellation lock the request row the same way, so an approval racing a rejection cannot leave a loan attached to a rejected request.
+
+| Race | Outcome |
+|---|---|
+| Two members scan the same asset | One `201`, one `409`, exactly one open loan |
+| Two administrators approve two requests for the same asset | One `200`, one `409`, one request approved, one still pending |
+| Two administrators act on the same request | One `200`, one `409` |
+| Two check-ins of the same loan | One `200`, one `409`, one closed record |
+
+**Optimistic locking (lost update protection).** `Equipment` carries a JPA `@Version` column, so every `UPDATE` is issued as `WHERE id = ? AND version = ?`. A record another transaction changed while this one was working fails with `OptimisticLockingFailureException` instead of being overwritten. Clients that echo the `version` they read get an earlier and clearer rejection, so a stale form cannot silently discard someone else's edit.
+
+| Failure | Response |
+|---|---|
+| Optimistic lock violation | `409` with `"code": "CONCURRENT_UPDATE"` and "Reload and try again" |
+| Row lock timeout | `409` with the same code |
+| Edit sent against a record that changed since it was loaded | `409` asking the administrator to reload and reapply |
+
+The `code` is what separates "someone else changed this" from a rule conflict such as an open maintenance ticket, so the interface only offers to close tickets for the latter.
+
+#### Applying the migration
+
+The schema change is one column, `equipment.version`, and it must exist **before** the new backend is deployed because Hibernate validates the mapping on startup.
+
+- **Deploy path:** Flyway runs `backend/src/main/resources/db/migration/V7__add_equipment_optimistic_lock.sql` on the next backend start.
+- **CLI path:** run `backend/sql/V7__add_equipment_optimistic_lock.sql` against the live schema first, then deploy.
+
+```bash
+mysql --host=<host> --user=<user> --password --database=<db> \
+      < backend/sql/V7__add_equipment_optimistic_lock.sql
+```
+
+Both files check `INFORMATION_SCHEMA` before altering anything, so running either one twice — or running the manual script before Flyway sees the migration — changes nothing on the second pass. The manual script also ends with a read-only query that lists any equipment row already inconsistent (marked in use without a loan, available while it is on loan, or available with an unresolved ticket). H2 development databases need neither file: `schema.sql` creates the column in memory on every start.
+
 ### Example health response
 
 ```json
@@ -432,6 +469,8 @@ The backend test suite includes context startup, authentication, role restrictio
 
 `EquipmentStatusConflictTest` extends that coverage to the equipment status rules: updates blocked by an open ticket or an active loan, confirmed ticket closure through `closeMaintenance`, check-in while a ticket is open, checking in one of two loans, duplicate tickets on one item, retired items, duplicate asset tags, issuing an item that is already out, and returns recorded through the wrong endpoint.
 
+`ConcurrentCheckoutTest` runs the races above on real threads: two simultaneous checkouts of one asset, two simultaneous approvals of two requests for one asset, two simultaneous check-ins of one loan, a stale edit rejected against a newer version, and the `version` column advancing on every change.
+
 ## 9. Current Scope and Limitations
 
 ### Implemented
@@ -446,6 +485,7 @@ The backend test suite includes context startup, authentication, role restrictio
 - Landing, sign-in, sign-up, dashboard, equipment, requests, transactions, maintenance, students, calendar, reports, notifications, audit, and settings screens.
 - Calendar and date-filtered CSV reports derive from actual event, equipment, and transaction records; the workspace dashboard shows live API data.
 - H2 schema for local development and Flyway-managed MySQL schema for deployment.
+- Concurrency control on equipment: issue, return, approval, and cancellation take a `SELECT ... FOR UPDATE` row lock so simultaneous actions are serialized, and the `@Version` column turns a lost update into a `409` instead of a silent overwrite.
 - Equipment status is guarded consistently across maintenance tickets, loans, and administrator edits; a refused transition returns `409` with an actionable message and a confirmed retry path.
 - One asset cannot hold two open loans, cannot be issued while it is still out, and cannot return to circulation while a maintenance ticket is unresolved.
 - Every API error returns the same `{timestamp, error}` shape, so the interface can display why a request was refused.

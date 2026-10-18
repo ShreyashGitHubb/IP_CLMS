@@ -15,8 +15,14 @@ public class Equipment {
   @NotBlank private String location;
   private String description;
   @Column(name = "created_at", nullable = false) private Instant createdAt = Instant.now();
+  /**
+   * Optimistic lock counter. Hibernate sends it in the UPDATE statement, so a record changed by another
+   * transaction while this one was working fails instead of overwriting the newer value.
+   */
+  @Version @Column(nullable = false) private Long version;
   public Long getId(){return id;} public String getName(){return name;} public void setName(String v){name=v;}
   public String getCategory(){return category;} public void setCategory(String v){category=v;} public String getAssetTag(){return assetTag;} public void setAssetTag(String v){assetTag=v;}
   public EquipmentStatus getStatus(){return status;} public void setStatus(EquipmentStatus v){status=v;} public String getLocation(){return location;} public void setLocation(String v){location=v;}
   public String getDescription(){return description;} public void setDescription(String v){description=v;} public Instant getCreatedAt(){return createdAt;}
+  public Long getVersion(){return version;} public void setVersion(Long v){version=v;}
 }

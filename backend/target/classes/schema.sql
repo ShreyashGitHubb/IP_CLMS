@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE TABLE IF NOT EXISTS equipment (
   id BIGSERIAL PRIMARY KEY, name VARCHAR(160) NOT NULL, category VARCHAR(80) NOT NULL, asset_tag VARCHAR(80) UNIQUE NOT NULL,
-  status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE', location VARCHAR(120) NOT NULL, description TEXT, created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+  status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE', location VARCHAR(120) NOT NULL, description TEXT, created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  version BIGINT NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS transactions (
   id BIGSERIAL PRIMARY KEY, equipment_id BIGINT NOT NULL REFERENCES equipment(id), user_id BIGINT NOT NULL REFERENCES users(id),
@@ -48,3 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status)
 CREATE INDEX IF NOT EXISTS idx_maintenance_equipment ON maintenance_tickets(equipment_id);
 CREATE INDEX IF NOT EXISTS idx_lab_events_start ON lab_events(starts_at);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at);
+
+-- Optimistic locking column for equipment. Kept separate from CREATE TABLE so an already initialised
+-- database picks it up on the next start (CREATE TABLE IF NOT EXISTS skips existing tables).
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;

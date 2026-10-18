@@ -84,12 +84,15 @@ public class EquipmentRequestController {
   @Transactional
   public EquipmentRequest decide(@PathVariable Long id, @Valid @RequestBody Decision decision, @RequestAttribute("currentUser") User user) {
     requireAdmin(user);
-    EquipmentRequest request = requests.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found."));
+    // Lock the request row: an approval and a rejection arriving together must not both see PENDING.
+    EquipmentRequest request = requests.findByIdForUpdate(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found."));
     if (!"PENDING".equals(request.getStatus())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "This request has already been reviewed.");
     }
     if ("APPROVED".equals(decision.status())) {
-      Equipment item = equipment.findById(request.getEquipmentId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
+      // Lock the equipment row first: two administrators approving two requests at the same moment are
+      // serialized here, so the second one sees the loan the first one just created.
+      Equipment item = equipment.findByIdForUpdate(request.getEquipmentId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
       if (item.getStatus() != EquipmentStatus.AVAILABLE) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "This equipment is no longer available.");
       }
@@ -104,7 +107,7 @@ public class EquipmentRequestController {
       transaction.setNotes(request.getPurpose());
       transactions.save(transaction);
       item.setStatus(EquipmentStatus.IN_USE);
-      equipment.save(item);
+      equipment.saveAndFlush(item);
     }
     request.setStatus(decision.status());
     request.setReviewedAt(Instant.now());

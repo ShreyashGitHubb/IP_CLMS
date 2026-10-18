@@ -31,10 +31,15 @@ public class EquipmentService {
    * circulation (AVAILABLE or IN_USE) until that ticket is resolved, otherwise the catalogue would offer an
    * item that is still in the workshop. Callers may pass closeMaintenance to resolve those tickets in the same
    * transaction, which is what the administrator confirms from the equipment form.
+   *
+   * Two layers of concurrency control apply here. The row carries a @Version column, so a record another
+   * transaction changed while this request was in flight fails with a 409 instead of being overwritten, and a
+   * caller that echoes the version it read gets an earlier, clearer rejection when its copy is already stale.
    */
   @Transactional
   public Equipment update(Long id, Equipment input, boolean closeMaintenance) {
     Equipment current=get(id);
+    requireUnchangedVersion(current, input.getVersion());
     requireUniqueAssetTag(input.getAssetTag(), id);
     if (isInCirculation(input.getStatus())) {
       if (transactions.existsByEquipmentIdAndReturnedAtIsNull(id)) {
@@ -51,7 +56,7 @@ public class EquipmentService {
       }
     }
     current.setName(input.getName()); current.setCategory(input.getCategory()); current.setAssetTag(input.getAssetTag());
-    current.setStatus(input.getStatus()); current.setLocation(input.getLocation()); current.setDescription(input.getDescription()); return repository.save(current);
+    current.setStatus(input.getStatus()); current.setLocation(input.getLocation()); current.setDescription(input.getDescription()); return repository.saveAndFlush(current);
   }
 
   public void delete(Long id) {
@@ -91,5 +96,15 @@ public class EquipmentService {
     if (clash != null && !clash.getId().equals(selfId)) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Asset tag \"" + tag + "\" is already used by \"" + clash.getName() + "\".");
     }
+  }
+
+  /**
+   * Rejects a save made against a copy another user already changed. Clients that do not send a version are
+   * still protected by the @Version column itself; this only turns a silent overwrite into a clear message.
+   */
+  private void requireUnchangedVersion(Equipment current, Long submittedVersion) {
+    if (submittedVersion == null || submittedVersion.equals(current.getVersion())) { return; }
+    throw new ResponseStatusException(HttpStatus.CONFLICT,
+      "This equipment record was changed by someone else while you were editing it. Reload the record and apply your change again.");
   }
 }

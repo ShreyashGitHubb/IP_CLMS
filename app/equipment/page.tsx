@@ -9,7 +9,7 @@ import { getSession } from '@/lib/auth'
 import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 import { AssetLabelModal } from '@/components/asset-label-modal'
 
-const emptyForm = { name: '', category: '', assetTag: '', status: 'AVAILABLE' as EquipmentItem['status'], location: '', description: '' }
+const emptyForm = { name: '', category: '', assetTag: '', status: 'AVAILABLE' as EquipmentItem['status'], location: '', description: '', version: null as number | null }
 const circulationStatuses: EquipmentItem['status'][] = ['AVAILABLE', 'IN_USE']
 
 export default function EquipmentPage() {
@@ -65,7 +65,7 @@ export default function EquipmentPage() {
   const openEdit = (item: EquipmentItem) => {
     setEditing(item)
     setFormOpen(true)
-    setForm({ name: item.name, category: item.category, assetTag: item.assetTag, status: item.status, location: item.location, description: item.description ?? '' })
+    setForm({ name: item.name, category: item.category, assetTag: item.assetTag, status: item.status, location: item.location, description: item.description ?? '', version: item.version ?? null })
   }
 
   const saveEquipment = async (event: FormEvent<HTMLFormElement>) => {
@@ -107,7 +107,10 @@ export default function EquipmentPage() {
       setNotice(closeMaintenance ? 'Equipment updated and its open maintenance ticket was closed.' : 'Equipment updated.')
       refresh(false)
     } catch (cause) {
-      if (!closeMaintenance && circulationStatuses.includes(form.status) && cause instanceof ApiError && cause.status === 409) {
+      // A concurrency conflict or a stale copy is reported as-is; only a maintenance rule conflict on an item
+      // that is actually in service offers to close its tickets.
+      const ruleConflict = cause instanceof ApiError && cause.status === 409 && cause.code !== 'CONCURRENT_UPDATE'
+      if (!closeMaintenance && ruleConflict && target.status === 'MAINTENANCE' && circulationStatuses.includes(form.status)) {
         setConfirmDialog({
           title: `${target.name} is not back in service yet`,
           detail: `${cause.message} Choosing "Close tickets & mark available" resolves the open maintenance work and saves this record.`,

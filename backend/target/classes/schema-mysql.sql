@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS equipment (
   location VARCHAR(120) NOT NULL,
   description TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  version BIGINT NOT NULL DEFAULT 0,
   INDEX idx_equipment_status (status)
 );
 

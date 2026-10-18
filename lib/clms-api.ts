@@ -2,10 +2,13 @@ import { clearSession, getApiBaseUrl, getSession } from '@/lib/auth'
 
 export class ApiError extends Error {
   status: number
+  /** Machine readable reason for failures that have several causes, e.g. CONCURRENT_UPDATE. */
+  code?: string
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -211,13 +214,15 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   }
   if (!response.ok) {
     let message = `Request failed (${response.status}).`
+    let code: string | undefined
     try {
-      const payload = await response.json() as { error?: string; message?: string }
+      const payload = await response.json() as { error?: string; message?: string; code?: string }
       message = payload.error || payload.message || message
+      code = payload.code
     } catch {
       // Keep the status-based message when the API returns no JSON body.
     }
-    throw new ApiError(message, response.status)
+    throw new ApiError(message, response.status, code)
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
@@ -250,6 +255,8 @@ export type EquipmentItem = {
   location: string
   description: string | null
   createdAt: string
+  /** Optimistic lock counter echoed back on save so a stale edit is rejected instead of overwriting. */
+  version?: number
 }
 
 export type LoanTransaction = {

@@ -140,6 +140,23 @@ Equipment status is shared state between maintenance tickets and loans, so every
 
 `POST /api/transactions` records checkouts only; returns go through `PUT /api/transactions/{id}/return` so the loan and the equipment status close together. An asset can hold only one open loan: issuing and request approval both check the transaction ledger, and checking one loan in keeps the item `IN_USE` while another loan is still open. The kiosk resolves the open loan on every scan for the same reason — a damage ticket moves an item to maintenance while it is still out, and the station must keep offering check-in.
 
+## 5.1 Concurrency control
+
+`TransactionService` owns the two writes that must never interleave, and reads the equipment row through `EquipmentRepository.findByIdForUpdate` (`@Lock(LockModeType.PESSIMISTIC_WRITE)`, `SELECT ... FOR UPDATE`). Request approval and cancellation lock their own request row through `EquipmentRequestRepository.findByIdForUpdate`. Locks are always taken equipment first, then the dependent row, so the flows cannot deadlock against each other.
+
+Two details matter for correctness. A locking query never refreshes an entity that the persistence context already holds, so the service resolves the asset of a loan with a scalar projection (`findEquipmentIdById`) before locking; and every write uses `saveAndFlush`, because a flush inside the transaction is what turns a lost update into an exception the exception handler can still translate into a `409` instead of a failure after the response is written.
+
+`Equipment` additionally carries a JPA `@Version` column (`equipment.version`), so a record changed underneath a running transaction fails with `OptimisticLockingFailureException` rather than being overwritten. `ApiExceptionHandler` maps that and any lock timeout to `409` with `"code": "CONCURRENT_UPDATE"`, which lets the frontend tell a lost race apart from a business rule conflict.
+
+### Schema migrations
+
+- `backend/src/main/resources/db/migration/V7__add_equipment_optimistic_lock.sql` — Flyway, runs on deploy.
+- `backend/sql/V7__add_equipment_optimistic_lock.sql` — same change for a CLI or SQL-console run against a live schema, plus a read-only report of inconsistent rows.
+
+Both are guarded with an `INFORMATION_SCHEMA` check, so applying the column by hand and then deploying does not fail Flyway. `schema.sql` and `schema-mysql.sql` carry the column for fresh databases.
+
+## 6. Design principles
+
 ## 6. Design principles
 
 - keep the frontend simple and visually strong for admin workflows

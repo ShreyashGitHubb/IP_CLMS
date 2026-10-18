@@ -1,6 +1,8 @@
 package com.metropolis.lab.common;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
@@ -11,8 +13,22 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+  /** Error code sent with concurrency conflicts so the UI can tell "someone else changed this" from a rule. */
+  public static final String CONCURRENT_UPDATE = "CONCURRENT_UPDATE";
+
   @ExceptionHandler(ResourceNotFoundException.class)
   ResponseEntity<?> notFound(ResourceNotFoundException e) { return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("timestamp", Instant.now(), "error", e.getMessage())); }
+  /**
+   * Two writers reached the same equipment row. The @Version column stopped one of them from overwriting the
+   * other, or a row lock timed out; either way the caller retries instead of corrupting the ledger.
+   */
+  @ExceptionHandler({OptimisticLockingFailureException.class, PessimisticLockingFailureException.class})
+  ResponseEntity<?> concurrentUpdate(RuntimeException e) {
+    return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+      "timestamp", Instant.now(),
+      "code", CONCURRENT_UPDATE,
+      "error", "Someone else updated this equipment at the same time. Reload and try again."));
+  }
   /**
    * Without this handler Spring answers with the bare status reason ("Conflict") and drops the message the
    * controllers wrote, so the UI can only tell the user that something conflicted, never why.
