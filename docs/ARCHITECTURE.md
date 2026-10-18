@@ -136,6 +136,9 @@ Equipment status is shared state between maintenance tickets and loans, so every
 ### Transactions
 - `GET /api/transactions`
 - `POST /api/transactions`
+- `PUT /api/transactions/{id}/return`
+
+`POST /api/transactions` records checkouts only; returns go through `PUT /api/transactions/{id}/return` so the loan and the equipment status close together. An asset can hold only one open loan: issuing and request approval both check the transaction ledger, and checking one loan in keeps the item `IN_USE` while another loan is still open. The kiosk resolves the open loan on every scan for the same reason — a damage ticket moves an item to maintenance while it is still out, and the station must keep offering check-in.
 
 ## 6. Design principles
 

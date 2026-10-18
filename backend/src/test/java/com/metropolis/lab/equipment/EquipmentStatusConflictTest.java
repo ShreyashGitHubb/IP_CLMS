@@ -143,6 +143,79 @@ class EquipmentStatusConflictTest {
   }
 
   @Test
+  void equipmentWithAnOpenLoanCannotBeIssuedAgain() throws Exception {
+    Long equipmentId = insertEquipment("Double Issue Scope", "CONFLICT-ISSUE-1", "IN_USE");
+    jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, admin.getId(), "BORROW");
+    // Status drifted back to AVAILABLE while the loan is still open: the ledger must still refuse the issue.
+    jdbcTemplate.update("UPDATE equipment SET status = 'AVAILABLE' WHERE id = ?", equipmentId);
+
+    mockMvc.perform(post("/api/transactions")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"equipmentId\":" + equipmentId + ",\"userId\":" + admin.getId() + ",\"action\":\"BORROW\"}"))
+      .andExpect(status().isConflict())
+      .andExpect(jsonPath("$.error").value("This equipment already has an open loan. Check it back in before issuing it again."));
+
+    assertEquals(1, jdbcTemplate.queryForObject(
+      "SELECT COUNT(*) FROM transactions WHERE equipment_id = ? AND returned_at IS NULL", Integer.class, equipmentId));
+  }
+
+  @Test
+  void returnsCannotBeRecordedByCreatingATransaction() throws Exception {
+    Long equipmentId = insertEquipment("Phantom Return Scope", "CONFLICT-RETURN-3", "IN_USE");
+    jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, admin.getId(), "BORROW");
+
+    mockMvc.perform(post("/api/transactions")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"equipmentId\":" + equipmentId + ",\"userId\":" + admin.getId() + ",\"action\":\"RETURN\"}"))
+      .andExpect(status().isConflict())
+      .andExpect(jsonPath("$.error").value("Record a return with PUT /api/transactions/{id}/return so the equipment status is updated with it."));
+
+    assertEquals(1, jdbcTemplate.queryForObject(
+      "SELECT COUNT(*) FROM transactions WHERE equipment_id = ?", Integer.class, equipmentId));
+  }
+
+  @Test
+  void checkingInOneLoanDoesNotReleaseEquipmentThatIsStillOut() throws Exception {
+    Long equipmentId = insertEquipment("Two Loan Scope", "CONFLICT-RETURN-4", "IN_USE");
+    jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, admin.getId(), "BORROW");
+    Long firstLoan = jdbcTemplate.queryForObject("SELECT id FROM transactions WHERE equipment_id = ?", Long.class, equipmentId);
+    Long secondLoan = insertLoan(equipmentId, "BORROW");
+
+    mockMvc.perform(put("/api/transactions/{id}/return", firstLoan)
+        .header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isOk());
+
+    assertEquals("IN_USE", equipmentStatus(equipmentId));
+
+    mockMvc.perform(put("/api/transactions/{id}/return", secondLoan)
+        .header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isOk());
+    assertEquals("AVAILABLE", equipmentStatus(equipmentId));
+  }
+
+  @Test
+  void requestApprovalIsBlockedWhileTheEquipmentIsAlreadyOnLoan() throws Exception {
+    Long equipmentId = insertEquipment("Approved Twice Scope", "CONFLICT-APPROVAL-1", "AVAILABLE");
+    jdbcTemplate.update("INSERT INTO equipment_requests (equipment_id, user_id, purpose, status) VALUES (?, ?, ?, ?)",
+      equipmentId, admin.getId(), "Second request", "PENDING");
+    Long requestId = jdbcTemplate.queryForObject("SELECT id FROM equipment_requests WHERE equipment_id = ?", Long.class, equipmentId);
+    insertLoan(equipmentId, "BORROW");
+
+    mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+        .patch("/api/requests/{id}/decision", requestId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"status\":\"APPROVED\"}"))
+      .andExpect(status().isConflict())
+      .andExpect(jsonPath("$.error").value("This equipment already has an open loan. Check it back in before approving another request."));
+
+    assertEquals("PENDING", jdbcTemplate.queryForObject(
+      "SELECT status FROM equipment_requests WHERE id = ?", String.class, requestId));
+  }
+
+  @Test
   void returningEquipmentWithoutOpenTicketsMakesItAvailable() throws Exception {
     Long equipmentId = insertEquipment("Clean Loan Scope", "CONFLICT-RETURN-2", "IN_USE");
     jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, admin.getId(), "BORROW");
@@ -239,6 +312,11 @@ class EquipmentStatusConflictTest {
       "INSERT INTO maintenance_tickets (equipment_id, opened_by, title, details, status) VALUES (?, ?, ?, ?, 'OPEN')",
       equipmentId, admin.getId(), "Power supply fault", "Replace the failing power supply");
     return jdbcTemplate.queryForObject("SELECT id FROM maintenance_tickets WHERE equipment_id = ?", Long.class, equipmentId);
+  }
+
+  private Long insertLoan(Long equipmentId, String action) {
+    jdbcTemplate.update("INSERT INTO transactions (equipment_id, user_id, action) VALUES (?, ?, ?)", equipmentId, admin.getId(), action);
+    return jdbcTemplate.queryForObject("SELECT MAX(id) FROM transactions WHERE equipment_id = ?", Long.class, equipmentId);
   }
 
   private String equipmentStatus(Long equipmentId) {

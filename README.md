@@ -197,6 +197,35 @@ Base URL for local development: `http://localhost:8080`.
 | `POST` | `/api/requests` | Request available equipment | Creates a pending request for the signed-in user |
 | `PATCH` | `/api/requests/{id}/decision` | Approve or reject request | Admin-only; approval creates the loan and marks equipment in use |
 
+### Equipment status, maintenance, and loan conflict rules
+
+Equipment status is written by three different flows — maintenance tickets, loans, and administrator edits — so the backend applies one rule set across all of them. A refused transition always answers `409` with a message that says what to do next.
+
+| Rule | Endpoint | Behavior |
+|---|---|---|
+| An item with an unresolved maintenance ticket cannot return to circulation (`AVAILABLE` or `IN_USE`) | `PUT /api/equipment/{id}` | `409` naming the number of open tickets; repeat the call with `?closeMaintenance=true` to resolve them in the same transaction |
+| An item with an open loan cannot return to circulation | `PUT /api/equipment/{id}` | `409` asking for the return to be recorded first |
+| Only one unresolved ticket per item | `POST /api/maintenance` | `409` |
+| A fault report never resurrects a `RETIRED` item | `POST /api/maintenance`, `PATCH /api/maintenance/{id}` | The ticket is recorded and the item stays `RETIRED` |
+| Checking in a loan does not release an item that is still on the repair bench | `PUT /api/transactions/{id}/return` | The item stays `MAINTENANCE` until its ticket is resolved |
+| Checking in a loan does not release an item another loan still holds | `PUT /api/transactions/{id}/return` | The item stays `IN_USE` |
+| An asset cannot be issued while it already has an open loan | `POST /api/transactions`, `PATCH /api/requests/{id}/decision` | `409`, checked against the transaction ledger and not only the cached status |
+| Returns must go through the return endpoint | `POST /api/transactions` with `action: RETURN` | `409`, otherwise the row reads as closed on one screen and open on another |
+| Asset tags are unique, case-insensitively | `POST /api/equipment`, `PUT /api/equipment/{id}` | `409` naming the record that already uses the tag |
+
+### Error responses
+
+Every error uses one shape, so the frontend can show the reason instead of a bare status:
+
+```json
+{
+  "timestamp": "2026-10-18T02:48:02.236Z",
+  "error": "This equipment has 1 unresolved maintenance ticket. Confirm to close it and return the item to circulation, or keep it in service."
+}
+```
+
+Validation failures add a `fields` map, and duplicate-key database errors add their own message. Earlier revisions answered a conflict with only `{"status":409,"error":"Conflict"}`, so the reason a request was refused never reached the screen.
+
 ### Example health response
 
 ```json
@@ -277,6 +306,14 @@ sequenceDiagram
 | `/reports` | Operational reports | Metrics derived from equipment, users, and transactions |
 | `/settings` | Account/service state | Shows signed-in role and live API connection |
 | Other paths | Unimplemented routes | Show not-found page |
+
+### Equipment status, maintenance, and check-in flows
+
+- `/equipment` — saving an item with a circulation status while a ticket is open answers `409`, so the form asks for confirmation, closes the open tickets, and retries with `?closeMaintenance=true`. Asset-tag collisions are reported inline with the conflicting record, delete keeps its linked-history confirmation, and retiring preserves history.
+- `/maintenance` — the incident form disables items that already have an unresolved ticket, and resolving the last open ticket is what returns an item to circulation (or to `IN_USE` when a loan is still active).
+- `/kiosk` — every scan resolves the item's open loan, so equipment that is physically out can always be checked back in, even after a damage ticket moved it to maintenance. Issue, check-in, and ticket actions report the resulting state after refreshing, and a check-in that leaves an item in service says so instead of claiming it is available.
+- Confirmation dialogs and modals grow to fit their labels, stack their buttons, and keep 44px touch targets on phones.
+- The kiosk station is laid out for phones: a full-width scan field, 48px primary actions, a 4:3 viewfinder, and text that wraps rather than forcing a horizontal scroll.
 
 ### Authentication and access flow
 
@@ -393,6 +430,8 @@ Name the final PDF using the group name as required by the instructor (for examp
 
 The backend test suite includes context startup, authentication, role restrictions, request approval, loan creation, and return-flow coverage. This does not replace verification against the deployed Render/Aiven/Vercel environment.
 
+`EquipmentStatusConflictTest` extends that coverage to the equipment status rules: updates blocked by an open ticket or an active loan, confirmed ticket closure through `closeMaintenance`, check-in while a ticket is open, checking in one of two loans, duplicate tickets on one item, retired items, duplicate asset tags, issuing an item that is already out, and returns recorded through the wrong endpoint.
+
 ## 9. Current Scope and Limitations
 
 ### Implemented
@@ -407,6 +446,10 @@ The backend test suite includes context startup, authentication, role restrictio
 - Landing, sign-in, sign-up, dashboard, equipment, requests, transactions, maintenance, students, calendar, reports, notifications, audit, and settings screens.
 - Calendar and date-filtered CSV reports derive from actual event, equipment, and transaction records; the workspace dashboard shows live API data.
 - H2 schema for local development and Flyway-managed MySQL schema for deployment.
+- Equipment status is guarded consistently across maintenance tickets, loans, and administrator edits; a refused transition returns `409` with an actionable message and a confirmed retry path.
+- One asset cannot hold two open loans, cannot be issued while it is still out, and cannot return to circulation while a maintenance ticket is unresolved.
+- Every API error returns the same `{timestamp, error}` shape, so the interface can display why a request was refused.
+- The Express Kiosk station is usable on phones and always offers check-in for equipment that is out on loan.
 
 ### Not yet implemented or not verified for production
 

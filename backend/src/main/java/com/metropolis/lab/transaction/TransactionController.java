@@ -34,15 +34,23 @@ public class TransactionController {
     if (!isAdmin && !currentUser.getId().equals(transaction.getUserId())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only check out equipment to your own account.");
     }
+    if ("RETURN".equalsIgnoreCase(transaction.getAction())) {
+      // A RETURN row created here would look closed to some screens and open to others. Returns go through
+      // PUT /api/transactions/{id}/return so the equipment state is updated in the same step.
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Record a return with PUT /api/transactions/{id}/return so the equipment status is updated with it.");
+    }
     Equipment item = equipmentRepository.findById(transaction.getEquipmentId())
       .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
-    if (item.getStatus() != EquipmentStatus.AVAILABLE && !"RETURN".equalsIgnoreCase(transaction.getAction())) {
+    if (item.getStatus() != EquipmentStatus.AVAILABLE) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Equipment is not available for checkout.");
     }
-    if (!"RETURN".equalsIgnoreCase(transaction.getAction())) {
-      item.setStatus(EquipmentStatus.IN_USE);
-      equipmentRepository.save(item);
+    // Guard the ledger itself, not only the cached status: issuing an item that already has an open loan
+    // creates two borrowers for one asset, and the first check-in would release it while it is still out.
+    if (repository.existsByEquipmentIdAndReturnedAtIsNull(item.getId())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "This equipment already has an open loan. Check it back in before issuing it again.");
     }
+    item.setStatus(EquipmentStatus.IN_USE);
+    equipmentRepository.save(item);
     return repository.save(transaction);
   }
 
@@ -58,15 +66,17 @@ public class TransactionController {
     }
     transaction.setReturnedAt(java.time.Instant.now());
     transaction.setAction("RETURN");
+    Transaction saved = repository.save(transaction);
     Equipment item = equipmentRepository.findById(transaction.getEquipmentId())
       .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
-    // A returned item only re-enters circulation once its maintenance tickets are resolved; otherwise the
-    // catalogue would offer equipment that is still on the repair bench.
+    // A returned item only re-enters circulation once its maintenance tickets are resolved and no other loan
+    // is still open; otherwise the catalogue would offer equipment that is still out or on the repair bench.
     if (item.getStatus() == EquipmentStatus.IN_USE) {
+      boolean stillOnLoan = repository.existsByEquipmentIdAndReturnedAtIsNull(item.getId());
       boolean underService = maintenanceTickets.existsByEquipmentIdAndStatusNot(item.getId(), MaintenanceTicketRepository.RESOLVED);
-      item.setStatus(underService ? EquipmentStatus.MAINTENANCE : EquipmentStatus.AVAILABLE);
+      item.setStatus(stillOnLoan ? EquipmentStatus.IN_USE : underService ? EquipmentStatus.MAINTENANCE : EquipmentStatus.AVAILABLE);
       equipmentRepository.save(item);
     }
-    return repository.save(transaction);
+    return saved;
   }
 }

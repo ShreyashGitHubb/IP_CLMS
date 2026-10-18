@@ -100,15 +100,12 @@ export default function KioskPage() {
       setScannedItem(item)
       setRecentScans((prev) => Array.from(new Set([item!.assetTag, ...prev])).slice(0, 5))
 
-      // Items that are checked out still need their loan record, even when a damage ticket has already
-      // moved them to maintenance: without it the station cannot check the item back in.
-      if (item.status === 'IN_USE' || item.status === 'MAINTENANCE') {
-        const transactions = await apiRequest<LoanTransaction[]>('/api/transactions')
-        const loan = transactions.find((t) => t.equipmentId === item!.id && !t.returnedAt) ?? null
-        setActiveLoan(loan)
-      } else {
-        setActiveLoan(null)
-      }
+      // Always resolve the open loan: a damage ticket moves an item to maintenance while it is still out,
+      // and a drifted record can look available while somebody has it. Without this the station would offer
+      // a checkout that the API rejects, or hide the check-in that closes the loan.
+      const transactions = await apiRequest<LoanTransaction[]>('/api/transactions')
+      const loan = transactions.find((t) => t.equipmentId === item!.id && !t.returnedAt) ?? null
+      setActiveLoan(loan)
 
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
         navigator.vibrate(60)
@@ -309,21 +306,21 @@ export default function KioskPage() {
         {/* Left Column: Barcode & QR Camera Scanner */}
         <div className="space-y-4 lg:col-span-5">
           {/* Scanner Viewfinder Box */}
-          <div className="border border-white/10 bg-[#171719] p-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <ScanLine className="h-4 w-4 text-[#9a80ff]" />
-                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-white">Scanner Viewfinder</span>
+          <div className="border border-white/10 bg-[#171719] p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <ScanLine className="h-4 w-4 shrink-0 text-[#9a80ff]" />
+                <span className="truncate font-mono text-[10px] font-semibold uppercase tracking-wider text-white sm:text-xs">Scanner Viewfinder</span>
               </div>
               {cameraActive ? (
-                <div className="flex items-center gap-1.5">
+                <div className="flex shrink-0 items-center gap-1.5">
                   <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                  <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-400">Live Active</span>
+                  <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-400">Live</span>
                 </div>
               ) : null}
             </div>
 
-            <div className="relative mt-3 flex aspect-video w-full items-center justify-center overflow-hidden border border-white/10 bg-[#101012]">
+            <div className="relative mt-3 flex aspect-[4/3] w-full items-center justify-center overflow-hidden border border-white/10 bg-[#101012] sm:aspect-video">
               <video
                 ref={videoRef}
                 playsInline
@@ -334,7 +331,7 @@ export default function KioskPage() {
               {cameraActive ? (
                 <>
                   {/* Glowing Sci-Fi Target Framing Corners */}
-                  <div className="pointer-events-none absolute inset-6 border-2 border-dashed border-[#9a80ff]/40">
+                  <div className="pointer-events-none absolute inset-4 border-2 border-dashed border-[#9a80ff]/40 sm:inset-6">
                     <div className="absolute -left-1 -top-1 h-3 w-3 border-l-2 border-t-2 border-[#9a80ff]" />
                     <div className="absolute -right-1 -top-1 h-3 w-3 border-r-2 border-t-2 border-[#9a80ff]" />
                     <div className="absolute -bottom-1 -left-1 h-3 w-3 border-b-2 border-l-2 border-[#9a80ff]" />
@@ -342,15 +339,15 @@ export default function KioskPage() {
                     {/* Laser sweep line animation */}
                     <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-[#9a80ff] to-transparent animate-pulse" />
                   </div>
-                  <div className="absolute bottom-2 rounded bg-black/70 px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider text-white">
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/70 px-2.5 py-1 text-center font-mono text-[9px] uppercase tracking-wider text-white">
                     Align QR or Barcode in frame
                   </div>
                 </>
               ) : (
-                <div className="flex flex-col items-center gap-2.5 p-6 text-center text-slate-400">
+                <div className="flex flex-col items-center gap-2.5 p-4 text-center text-slate-400 sm:p-6">
                   <ScanLine className="h-9 w-9 text-slate-500" />
-                  <p className="font-mono text-xs uppercase tracking-wider text-white">Camera is Standby</p>
-                  <p className="max-w-xs text-xs text-slate-400">Enable video camera scanner or use physical barcode scanner below.</p>
+                  <p className="font-mono text-[11px] uppercase tracking-wider text-white sm:text-xs">Camera is Standby</p>
+                  <p className="max-w-xs text-[11px] text-slate-400 sm:text-xs">Enable video camera scanner or use physical barcode scanner below.</p>
                 </div>
               )}
             </div>
@@ -362,17 +359,17 @@ export default function KioskPage() {
                   <button
                     type="button"
                     onClick={switchCamera}
-                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-white/15 px-3 text-xs font-medium text-slate-200 transition-colors hover:bg-white/5 hover:text-white"
+                    className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-white/15 px-3 text-xs font-medium text-slate-200 transition-colors hover:bg-white/5 hover:text-white sm:h-9"
                   >
-                    <FlipHorizontal className="h-3.5 w-3.5" />
-                    <span>Flip Camera</span>
+                    <FlipHorizontal className="h-3.5 w-3.5 shrink-0" />
+                    <span>Flip</span>
                   </button>
                   <button
                     type="button"
                     onClick={stopCamera}
-                    className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-red-500/30 bg-red-950/20 px-3 text-xs font-medium text-red-200 transition-colors hover:bg-red-950/40"
+                    className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-red-500/30 bg-red-950/20 px-3 text-xs font-medium text-red-200 transition-colors hover:bg-red-950/40 sm:h-9"
                   >
-                    <CameraOff className="h-3.5 w-3.5" />
+                    <CameraOff className="h-3.5 w-3.5 shrink-0" />
                     <span>Turn Off</span>
                   </button>
                 </>
@@ -380,9 +377,9 @@ export default function KioskPage() {
                 <button
                   type="button"
                   onClick={() => void startCamera()}
-                  className="inline-flex h-10 w-full items-center justify-center gap-2 whitespace-nowrap rounded-sm bg-[#8e73ff] px-4 text-xs font-semibold tracking-wide text-white transition-colors hover:bg-[#a18cff]"
+                  className="inline-flex h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-sm bg-[#8e73ff] px-4 text-sm font-semibold tracking-wide text-white transition-colors hover:bg-[#a18cff] sm:h-10 sm:text-xs"
                 >
-                  <Camera className="h-4 w-4" />
+                  <Camera className="h-4 w-4 shrink-0" />
                   <span>Enable Camera Scanner</span>
                 </button>
               )}
@@ -390,24 +387,25 @@ export default function KioskPage() {
           </div>
 
           {/* Barcode Gun / Manual Asset Tag Input */}
-          <div className="border border-white/10 bg-[#171719] p-4">
+          <div className="border border-white/10 bg-[#171719] p-3 sm:p-4">
             <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-400">Hardware Scanner & Manual Tag</div>
-            <form onSubmit={handleManualSubmit} className="mt-3 flex items-center gap-2">
-              <div className="relative flex-1">
+            {/* Stacked on phones so the placeholder and the button both stay fully visible */}
+            <form onSubmit={handleManualSubmit} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative w-full flex-1 sm:w-auto">
                 <input
                   ref={inputRef}
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   placeholder="Scan barcode or enter asset tag..."
-                  className="h-10 w-full border border-white/15 bg-[#101012] px-3 font-mono text-xs text-white placeholder:text-slate-500 outline-none focus:border-[#9a80ff]"
+                  className="h-12 w-full border border-white/15 bg-[#101012] px-3 font-mono text-sm text-white placeholder:text-slate-500 outline-none focus:border-[#9a80ff] sm:h-10 sm:text-xs"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || !tagInput.trim()}
-                className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-sm bg-[#8e73ff] px-4 text-xs font-semibold tracking-wide text-white transition-colors hover:bg-[#a18cff] disabled:opacity-40"
+                className="inline-flex h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-sm bg-[#8e73ff] px-4 text-sm font-semibold tracking-wide text-white transition-colors hover:bg-[#a18cff] disabled:opacity-40 sm:h-10 sm:w-auto sm:text-xs"
               >
-                <Search className="h-3.5 w-3.5" />
+                <Search className="h-3.5 w-3.5 shrink-0" />
                 <span>Lookup</span>
               </button>
             </form>
@@ -421,7 +419,7 @@ export default function KioskPage() {
                     key={tag}
                     type="button"
                     onClick={() => void lookupTag(tag)}
-                    className="border border-white/10 bg-[#111113] px-2.5 py-1 font-mono text-[9px] text-[#c7b7ff] transition-colors hover:border-[#9a80ff]"
+                    className="min-h-9 border border-white/10 bg-[#111113] px-2.5 py-1 font-mono text-[10px] text-[#c7b7ff] transition-colors hover:border-[#9a80ff] sm:min-h-0 sm:text-[9px]"
                   >
                     {tag}
                   </button>
@@ -434,25 +432,25 @@ export default function KioskPage() {
         {/* Right Column: Scanned Item & Context Actions */}
         <div className="space-y-4 lg:col-span-7">
           {loading ? (
-            <div className="flex h-72 items-center justify-center border border-white/10 bg-[#171719] text-center font-mono text-xs uppercase tracking-wider text-slate-400">
+            <div className="flex h-72 items-center justify-center border border-white/10 bg-[#171719] p-4 text-center font-mono text-xs uppercase tracking-wider text-slate-400">
               Looking up asset in database…
             </div>
           ) : scannedItem ? (
-            <div className="border border-white/10 bg-[#171719] p-5">
+            <div className="border border-white/10 bg-[#171719] p-3 sm:p-5">
               {/* Header with Asset Tag & QR Modal Trigger */}
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
-                <div>
+                <div className="min-w-0">
                   <div className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-[#9a80ff]">
                     {scannedItem.category} · Asset #{scannedItem.id}
                   </div>
                   <h2 className="mt-1 text-base font-semibold text-white">{scannedItem.name}</h2>
-                  <div className="mt-1 flex items-center gap-2 font-mono text-[9px] text-slate-400">
+                  <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[9px] text-slate-400">
                     <span className="rounded bg-white/10 px-2 py-0.5 text-white">{scannedItem.assetTag}</span>
-                    <span>📍 {scannedItem.location}</span>
+                    <span className="break-words">📍 {scannedItem.location}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex w-full items-center gap-2 sm:w-auto">
                   <span
                     className={`rounded px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-wider ${
                       scannedItem.status === 'AVAILABLE'
@@ -470,9 +468,9 @@ export default function KioskPage() {
                     type="button"
                     onClick={() => setLabelModalItem(scannedItem)}
                     title="Generate & Print Thermal QR Label"
-                    className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap border border-white/15 bg-white/5 px-2.5 font-mono text-[9px] uppercase tracking-wider text-slate-200 transition-colors hover:bg-white/10 hover:text-white"
+                    className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-white/15 bg-white/5 px-2.5 font-mono text-[9px] uppercase tracking-wider text-slate-200 transition-colors hover:bg-white/10 hover:text-white sm:h-8 sm:flex-none"
                   >
-                    <QrCode className="h-3.5 w-3.5" />
+                    <QrCode className="h-3.5 w-3.5 shrink-0" />
                     <span>Print Sticker</span>
                   </button>
                 </div>
@@ -482,10 +480,10 @@ export default function KioskPage() {
               <div className="mt-5">
                 {scannedItem.status === 'AVAILABLE' && !activeLoan ? (
                   /* AVAILABLE: Express Checkout Form */
-                  <div className="space-y-4 rounded border border-emerald-400/20 bg-emerald-950/10 p-4">
+                  <div className="space-y-4 rounded border border-emerald-400/20 bg-emerald-950/10 p-3 sm:p-4">
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                      <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-emerald-300">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                      <h3 className="font-mono text-[11px] font-semibold uppercase leading-tight tracking-wider text-emerald-300 sm:text-xs">
                         Item Ready for Immediate Checkout
                       </h3>
                     </div>
@@ -497,7 +495,7 @@ export default function KioskPage() {
                           <select
                             value={selectedUserId}
                             onChange={(e) => setSelectedUserId(e.target.value)}
-                            className="h-9 w-full border border-white/15 bg-[#101012] px-2.5 font-sans text-xs text-white outline-none"
+                            className="h-11 w-full border border-white/15 bg-[#101012] px-2.5 font-sans text-xs text-white outline-none sm:h-9"
                           >
                             {allUsers.map((user) => (
                               <option key={user.id} value={user.id}>
@@ -506,8 +504,8 @@ export default function KioskPage() {
                             ))}
                           </select>
                         ) : (
-                          <div className="mt-1 flex h-9 items-center gap-2 border border-[#9a80ff]/30 bg-[#9a80ff]/10 px-2.5">
-                            <span className="inline-block h-2 w-2 rounded-full bg-[#9a80ff]" />
+                          <div className="mt-1 flex h-11 items-center gap-2 border border-[#9a80ff]/30 bg-[#9a80ff]/10 px-2.5 sm:h-9">
+                            <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-[#9a80ff]" />
                             <span className="font-mono text-[10px] font-semibold text-[#c9b9ff]">
                               Your account (self-checkout)
                             </span>
@@ -528,7 +526,7 @@ export default function KioskPage() {
                               key={String(days)}
                               type="button"
                               onClick={() => setDueDays(Number(days))}
-                              className={`h-9 flex-1 border font-mono text-xs font-semibold uppercase tracking-wider transition-colors ${
+                              className={`h-11 flex-1 border font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors sm:h-9 sm:text-xs ${
                                 dueDays === days
                                   ? 'border-[#9a80ff] bg-[#9a80ff]/20 text-[#c9b9ff]'
                                   : 'border-white/10 bg-[#101012] text-slate-400 hover:text-white'
@@ -546,30 +544,30 @@ export default function KioskPage() {
                           value={notes}
                           onChange={(e) => setNotes(e.target.value)}
                           placeholder="e.g. Experiment 4 Lab session"
-                          className="h-9 w-full border border-white/15 bg-[#101012] px-3 font-sans text-xs text-white outline-none focus:border-[#9a80ff]"
+                          className="h-11 w-full border border-white/15 bg-[#101012] px-3 font-sans text-sm text-white outline-none focus:border-[#9a80ff] sm:h-9 sm:text-xs"
                         />
                       </label>
                     </div>
 
-                    <div className="flex justify-end pt-2">
+                    <div className="pt-2 sm:flex sm:justify-end">
                       <button
                         type="button"
                         onClick={() => void handleFastIssue()}
                         disabled={working || !selectedUserId}
-                        className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-sm bg-[#8e73ff] px-5 text-xs font-semibold tracking-wide text-white transition-colors hover:bg-[#a18cff] disabled:opacity-50"
+                        className="inline-flex h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-sm bg-[#8e73ff] px-5 text-sm font-semibold tracking-wide text-white transition-colors hover:bg-[#a18cff] disabled:opacity-50 sm:h-10 sm:w-auto sm:text-xs"
                       >
-                        <UserCheck className="h-4 w-4" />
+                        <UserCheck className="h-4 w-4 shrink-0" />
                         <span>{working ? 'Processing…' : 'Issue Equipment to Member'}</span>
                       </button>
                     </div>
                   </div>
                 ) : activeLoan || scannedItem.status === 'IN_USE' ? (
                   /* On loan: Express Return / Check-in — shown even when a damage ticket moved the item to service */
-                  <div className="space-y-4 rounded border border-[#9a80ff]/20 bg-[#292244]/20 p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-[#9a80ff]" />
-                        <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-[#c9b9ff]">
+                  <div className="space-y-4 rounded border border-[#9a80ff]/20 bg-[#292244]/20 p-3 sm:p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Clock className="h-4 w-4 shrink-0 text-[#9a80ff]" />
+                        <h3 className="font-mono text-[11px] font-semibold uppercase leading-tight tracking-wider text-[#c9b9ff] sm:text-xs">
                           Active Loan on Record
                         </h3>
                       </div>
@@ -580,27 +578,27 @@ export default function KioskPage() {
                       ) : null}
                     </div>
 
-                    <div className="grid gap-2 border-y border-white/10 py-3 font-mono text-xs">
-                      <div>
+                    <div className="grid gap-2 border-y border-white/10 py-3 font-mono text-[11px] sm:text-xs">
+                      <div className="break-words">
                         <span className="text-slate-400">Borrowed By: </span>
                         <span className="font-semibold text-white">
                           {borrowerUser ? `${borrowerUser.name} (${borrowerUser.email})` : `User #${activeLoan?.userId ?? 'Unknown'}`}
                         </span>
                       </div>
-                      <div>
+                      <div className="break-words">
                         <span className="text-slate-400">Issued At: </span>
                         <span className="text-slate-200">
                           {activeLoan ? new Date(activeLoan.createdAt).toLocaleString() : '—'}
                         </span>
                       </div>
-                      <div>
+                      <div className="break-words">
                         <span className="text-slate-400">Due Date: </span>
                         <span className="text-slate-200">
                           {activeLoan?.dueAt ? new Date(activeLoan.dueAt).toLocaleDateString() : 'No due date specified'}
                         </span>
                       </div>
                       {activeLoan?.notes ? (
-                        <div>
+                        <div className="break-words">
                           <span className="text-slate-400">Notes: </span>
                           <span className="text-slate-300">{activeLoan.notes}</span>
                         </div>
@@ -611,9 +609,9 @@ export default function KioskPage() {
                       <button
                         type="button"
                         onClick={() => setMaintenanceOpen(true)}
-                        className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap border border-amber-400/40 bg-amber-950/20 px-4 text-xs font-semibold text-amber-300 transition-colors hover:bg-amber-950/40"
+                        className="inline-flex h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap border border-amber-400/40 bg-amber-950/20 px-4 text-sm font-semibold text-amber-300 transition-colors hover:bg-amber-950/40 sm:h-10 sm:w-auto sm:text-xs"
                       >
-                        <Wrench className="h-3.5 w-3.5" />
+                        <Wrench className="h-3.5 w-3.5 shrink-0" />
                         <span>Report Damage / Issue</span>
                       </button>
 
@@ -621,20 +619,20 @@ export default function KioskPage() {
                         type="button"
                         onClick={() => void handleFastReturn()}
                         disabled={working}
-                        className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-sm bg-emerald-600 px-5 text-xs font-semibold tracking-wide text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                        className="inline-flex h-12 w-full items-center justify-center gap-2 whitespace-nowrap rounded-sm bg-emerald-600 px-5 text-sm font-semibold tracking-wide text-white transition-colors hover:bg-emerald-500 disabled:opacity-50 sm:h-10 sm:w-auto sm:text-xs"
                       >
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4 shrink-0" />
                         <span>{working ? 'Processing Check-in…' : 'One-Tap Check-in / Return'}</span>
                       </button>
                     </div>
                   </div>
                 ) : (
                   /* MAINTENANCE / RETIRED */
-                  <div className="rounded border border-amber-400/20 bg-amber-950/15 p-4 text-slate-300">
-                    <div className="font-mono text-xs font-semibold uppercase tracking-wider text-amber-300">
+                  <div className="rounded border border-amber-400/20 bg-amber-950/15 p-3 text-slate-300 sm:p-4">
+                    <div className="font-mono text-[11px] font-semibold uppercase leading-tight tracking-wider text-amber-300 sm:text-xs">
                       Equipment Under Service or Retired
                     </div>
-                    <p className="mt-1 text-xs">
+                    <p className="mt-1 text-[11px] sm:text-xs">
                       This item is marked as {scannedItem.status}. It cannot be checked out to members until released.
                     </p>
                   </div>
@@ -663,63 +661,64 @@ export default function KioskPage() {
 
       {/* Report Damage / Quick Maintenance Dialog */}
       {maintenanceOpen && scannedItem ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4">
           <form
             onSubmit={handleOpenMaintenance}
-            className="w-full max-w-md border border-white/10 bg-[#171719] p-5 shadow-2xl"
+            className="my-auto w-full max-w-md border border-white/10 bg-[#171719] p-4 shadow-2xl sm:p-5"
           >
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div>
+            <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+              <div className="min-w-0">
                 <div className="font-mono text-[8px] uppercase tracking-wider text-amber-300">Service Ticket</div>
-                <h3 className="text-sm font-medium text-white">Flag {scannedItem.name}</h3>
+                <h3 className="mt-0.5 break-words text-sm font-medium text-white">Flag {scannedItem.name}</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setMaintenanceOpen(false)}
-                className="flex h-7 w-7 items-center justify-center border border-white/10 text-[#888] hover:text-white"
+                aria-label="Close service ticket"
+                className="flex h-9 w-9 shrink-0 items-center justify-center border border-white/10 text-[#888] hover:text-white sm:h-7 sm:w-7"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="mt-4 space-y-3">
-              <label className="block space-y-1 font-mono text-[8px] uppercase tracking-wider text-[#888]">
+              <label className="block space-y-1 font-mono text-[9px] uppercase tracking-wider text-[#888]">
                 Issue Title
                 <input
                   required
                   value={maintTitle}
                   onChange={(e) => setMaintTitle(e.target.value)}
                   placeholder="e.g. Probe damaged or calibration error"
-                  className="h-8 w-full border border-white/10 bg-[#101012] px-2 font-sans text-[10px] text-white outline-none focus:border-[#9a80ff]"
+                  className="h-11 w-full border border-white/10 bg-[#101012] px-2 font-sans text-sm text-white outline-none focus:border-[#9a80ff] sm:h-9 sm:text-[10px]"
                 />
               </label>
 
-              <label className="block space-y-1 font-mono text-[8px] uppercase tracking-wider text-[#888]">
+              <label className="block space-y-1 font-mono text-[9px] uppercase tracking-wider text-[#888]">
                 Description / Condition
                 <textarea
                   rows={3}
                   value={maintDetails}
                   onChange={(e) => setMaintDetails(e.target.value)}
                   placeholder="Describe damage observed upon check-in"
-                  className="w-full border border-white/10 bg-[#101012] p-2 font-sans text-[10px] text-white outline-none focus:border-[#9a80ff]"
+                  className="w-full border border-white/10 bg-[#101012] p-2 font-sans text-sm text-white outline-none focus:border-[#9a80ff] sm:text-[10px]"
                 />
               </label>
             </div>
 
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setMaintenanceOpen(false)}
-                className="h-8 border border-white/10 px-3 text-[9px] uppercase tracking-wider text-[#aaa]"
+                className="min-h-11 border border-white/10 px-3 text-[10px] uppercase tracking-wider text-[#aaa] sm:min-h-0 sm:h-8 sm:text-[9px]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={working}
-                className="inline-flex h-8 items-center gap-1.5 bg-amber-600 px-3 text-[9px] font-medium uppercase tracking-wider text-white hover:bg-amber-500"
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 bg-amber-600 px-4 text-[10px] font-medium uppercase tracking-wider text-white hover:bg-amber-500 disabled:opacity-50 sm:min-h-0 sm:h-8 sm:px-3 sm:text-[9px]"
               >
-                <Wrench className="h-3 w-3" />
+                <Wrench className="h-3 w-3 shrink-0" />
                 {working ? 'Saving…' : 'Submit Ticket'}
               </button>
             </div>

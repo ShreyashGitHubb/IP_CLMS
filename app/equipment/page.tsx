@@ -254,26 +254,28 @@ export default function EquipmentPage() {
       <div
         role="dialog"
         aria-modal="true"
-        className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm"
         onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmDialog(null) }}
       >
-        <div className="w-full max-w-sm border border-white/10 bg-[#1b1b1d] p-5 shadow-2xl">
+        <div className="my-auto w-full max-w-md border border-white/10 bg-[#1b1b1d] p-5 shadow-2xl">
           <h3 className="text-sm font-semibold text-white">{confirmDialog.title}</h3>
           {confirmDialog.detail && (
             <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{confirmDialog.detail}</p>
           )}
-          <div className="mt-5 flex justify-end gap-2">
+          {/* Labels are long ("Force Delete Everything"), so let the buttons grow and stack on narrow screens
+              instead of fixing their height and letting the text spill out. Confirm stays last for thumb reach. */}
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => setConfirmDialog(null)}
-              className="h-8 border border-white/15 px-4 text-[9px] uppercase tracking-wider text-slate-300 hover:bg-white/5"
+              className="min-h-11 w-full border border-white/15 px-4 py-2 text-center text-[10px] uppercase leading-tight tracking-wider text-slate-300 hover:bg-white/5 sm:min-h-0 sm:w-auto"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={confirmDialog.onConfirm}
-              className={`h-8 px-4 text-[9px] font-semibold uppercase tracking-wider text-white ${
+              className={`min-h-11 w-full px-4 py-2 text-center text-[10px] font-semibold uppercase leading-tight tracking-wider text-white sm:min-h-0 sm:w-auto ${
                 confirmDialog.danger ? 'bg-red-600 hover:bg-red-500' : 'bg-amber-600 hover:bg-amber-500'
               }`}
             >

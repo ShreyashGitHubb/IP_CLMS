@@ -93,6 +93,9 @@ public class EquipmentRequestController {
       if (item.getStatus() != EquipmentStatus.AVAILABLE) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "This equipment is no longer available.");
       }
+      if (transactions.existsByEquipmentIdAndReturnedAtIsNull(item.getId())) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "This equipment already has an open loan. Check it back in before approving another request.");
+      }
       Transaction transaction = new Transaction();
       transaction.setEquipmentId(item.getId());
       transaction.setUserId(request.getUserId());

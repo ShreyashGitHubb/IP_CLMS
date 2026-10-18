@@ -55,7 +55,7 @@ export function AssetLabelModal({ item, onClose }: AssetLabelModalProps) {
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-xs"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -85,17 +85,17 @@ export function AssetLabelModal({ item, onClose }: AssetLabelModalProps) {
         }
       `}</style>
 
-      <div className="w-full max-w-lg border border-white/10 bg-[#171719] p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
-          <div>
+      <div className="my-auto w-full max-w-lg border border-white/10 bg-[#171719] p-4 shadow-2xl sm:p-6">
+        <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3.5">
+          <div className="min-w-0">
             <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-[#9a80ff]">Physical Asset Label</div>
-            <h2 className="mt-0.5 text-sm font-semibold text-white">{item.name}</h2>
+            <h2 className="mt-0.5 break-words text-sm font-semibold text-white">{item.name}</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close modal"
-            className="flex h-8 w-8 items-center justify-center border border-white/10 text-slate-400 transition-colors hover:text-white"
+            className="flex h-9 w-9 shrink-0 items-center justify-center border border-white/10 text-slate-400 transition-colors hover:text-white sm:h-8 sm:w-8"
           >
             <X className="h-4 w-4" />
           </button>
@@ -171,13 +171,13 @@ export function AssetLabelModal({ item, onClose }: AssetLabelModalProps) {
         </div>
 
         {/* Action Buttons */}
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-          <div className="flex items-center gap-2">
+        <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={copyTag}
               title="Copy Asset Tag"
-              className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap border border-white/15 bg-white/5 px-3 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-white/15 bg-white/5 px-3 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10 sm:h-9 sm:flex-none"
             >
               {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
               <span>{copied ? 'Copied' : 'Copy Tag'}</span>
@@ -186,7 +186,7 @@ export function AssetLabelModal({ item, onClose }: AssetLabelModalProps) {
               type="button"
               onClick={downloadSvg}
               title="Download QR code SVG"
-              className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap border border-white/15 bg-white/5 px-3 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border border-white/15 bg-white/5 px-3 text-xs font-medium text-slate-200 transition-colors hover:bg-white/10 sm:h-9 sm:flex-none"
             >
               <Download className="h-3.5 w-3.5" />
               <span>SVG</span>
@@ -196,7 +196,7 @@ export function AssetLabelModal({ item, onClose }: AssetLabelModalProps) {
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-sm bg-[#8e73ff] px-4 text-xs font-semibold tracking-wide text-white shadow-sm transition-colors hover:bg-[#a18cff]"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-sm bg-[#8e73ff] px-4 text-xs font-semibold tracking-wide text-white shadow-sm transition-colors hover:bg-[#a18cff] sm:h-9 sm:w-auto"
           >
             <Printer className="h-3.5 w-3.5" />
             <span>Print Sticker</span>
