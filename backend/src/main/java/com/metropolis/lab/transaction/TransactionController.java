@@ -3,6 +3,7 @@ package com.metropolis.lab.transaction;
 import com.metropolis.lab.equipment.Equipment;
 import com.metropolis.lab.equipment.EquipmentRepository;
 import com.metropolis.lab.equipment.EquipmentStatus;
+import com.metropolis.lab.maintenance.MaintenanceTicketRepository;
 import com.metropolis.lab.user.User;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -16,7 +17,8 @@ import java.util.List;
 public class TransactionController {
   private final TransactionRepository repository;
   private final EquipmentRepository equipmentRepository;
-  public TransactionController(TransactionRepository repository, EquipmentRepository equipmentRepository){this.repository=repository; this.equipmentRepository=equipmentRepository;}
+  private final MaintenanceTicketRepository maintenanceTickets;
+  public TransactionController(TransactionRepository repository, EquipmentRepository equipmentRepository, MaintenanceTicketRepository maintenanceTickets){this.repository=repository; this.equipmentRepository=equipmentRepository; this.maintenanceTickets=maintenanceTickets;}
   @GetMapping public List<Transaction> list(@RequestAttribute("currentUser") User currentUser){
     return "ADMIN".equals(currentUser.getRole())
       ? repository.findAll()
@@ -58,8 +60,11 @@ public class TransactionController {
     transaction.setAction("RETURN");
     Equipment item = equipmentRepository.findById(transaction.getEquipmentId())
       .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
+    // A returned item only re-enters circulation once its maintenance tickets are resolved; otherwise the
+    // catalogue would offer equipment that is still on the repair bench.
     if (item.getStatus() == EquipmentStatus.IN_USE) {
-      item.setStatus(EquipmentStatus.AVAILABLE);
+      boolean underService = maintenanceTickets.existsByEquipmentIdAndStatusNot(item.getId(), MaintenanceTicketRepository.RESOLVED);
+      item.setStatus(underService ? EquipmentStatus.MAINTENANCE : EquipmentStatus.AVAILABLE);
       equipmentRepository.save(item);
     }
     return repository.save(transaction);

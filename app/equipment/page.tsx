@@ -10,6 +10,7 @@ import { useApiLiveRevision } from '@/lib/use-api-live-revision'
 import { AssetLabelModal } from '@/components/asset-label-modal'
 
 const emptyForm = { name: '', category: '', assetTag: '', status: 'AVAILABLE' as EquipmentItem['status'], location: '', description: '' }
+const circulationStatuses: EquipmentItem['status'][] = ['AVAILABLE', 'IN_USE']
 
 export default function EquipmentPage() {
   const liveRevision = useApiLiveRevision()
@@ -69,19 +70,57 @@ export default function EquipmentPage() {
 
   const saveEquipment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    await persistEquipment(false)
+  }
+
+  // Equipment carrying an unresolved maintenance ticket cannot re-enter circulation from this form.
+  // The API answers 409 in that case, so ask the administrator to confirm closing the open tickets and
+  // retry with closeMaintenance=true instead of leaving them with a dead-end error.
+  const persistEquipment = async (closeMaintenance: boolean) => {
+    if (!editing) {
+      setWorking(true)
+      setError('')
+      try {
+        await apiRequest<EquipmentItem>('/api/equipment', { method: 'POST', body: JSON.stringify(form) })
+        setEditing(null)
+        setFormOpen(false)
+        setNotice('Equipment added.')
+        refresh(false)
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Could not save equipment.')
+      } finally {
+        setWorking(false)
+      }
+      return
+    }
+
+    const target = editing
     setWorking(true)
     setError('')
     try {
-      await apiRequest<EquipmentItem>(editing ? `/api/equipment/${editing.id}` : '/api/equipment', {
-        method: editing ? 'PUT' : 'POST',
+      await apiRequest<EquipmentItem>(`/api/equipment/${target.id}${closeMaintenance ? '?closeMaintenance=true' : ''}`, {
+        method: 'PUT',
         body: JSON.stringify(form),
       })
       setEditing(null)
       setFormOpen(false)
-      setNotice(editing ? 'Equipment updated.' : 'Equipment added.')
+      setNotice(closeMaintenance ? 'Equipment updated and its open maintenance ticket was closed.' : 'Equipment updated.')
       refresh(false)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save equipment.')
+      if (!closeMaintenance && circulationStatuses.includes(form.status) && cause instanceof ApiError && cause.status === 409) {
+        setConfirmDialog({
+          title: `${target.name} is not back in service yet`,
+          detail: `${cause.message} Choosing "Close tickets & mark available" resolves the open maintenance work and saves this record.`,
+          confirmLabel: 'Close tickets & mark available',
+          danger: false,
+          onConfirm: () => {
+            setConfirmDialog(null)
+            void persistEquipment(true)
+          },
+        })
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Could not save equipment.')
+      }
     } finally {
       setWorking(false)
     }

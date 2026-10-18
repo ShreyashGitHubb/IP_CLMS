@@ -16,7 +16,7 @@ public class EquipmentController {
   @GetMapping("/{id}") public Equipment get(@PathVariable Long id){return service.get(id);}
   @GetMapping("/tag/{tag}") public Equipment getByTag(@PathVariable String tag){return service.findByTag(tag);}
   @PostMapping @ResponseStatus(HttpStatus.CREATED) public Equipment create(@Valid @RequestBody Equipment equipment, @RequestAttribute("currentUser") User user){requireAdmin(user); return service.create(equipment);}
-  @PutMapping("/{id}") public Equipment update(@PathVariable Long id, @Valid @RequestBody Equipment equipment, @RequestAttribute("currentUser") User user){requireAdmin(user); return service.update(id, equipment);}
+  @PutMapping("/{id}") public Equipment update(@PathVariable Long id, @Valid @RequestBody Equipment equipment, @RequestAttribute("currentUser") User user, @RequestParam(value = "closeMaintenance", defaultValue = "false") boolean closeMaintenance){requireAdmin(user); return service.update(id, equipment, closeMaintenance);}
   @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void delete(@PathVariable Long id, @RequestParam(value = "force", defaultValue = "false") boolean force, @RequestAttribute("currentUser") User user){requireAdmin(user); service.delete(id, force);}
 
   private void requireAdmin(User user) {

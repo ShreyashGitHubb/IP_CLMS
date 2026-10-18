@@ -125,8 +125,10 @@ backend/src/main/java/com/metropolis/lab/
 - `GET /api/equipment`
 - `GET /api/equipment/{id}`
 - `POST /api/equipment`
-- `PUT /api/equipment/{id}`
+- `PUT /api/equipment/{id}` — add `?closeMaintenance=true` to resolve the item's unresolved maintenance tickets in the same transaction when returning it to circulation
 - `DELETE /api/equipment/{id}`
+
+Equipment status is shared state between maintenance tickets and loans, so every writer goes through the same rules: logging a ticket moves an item to `MAINTENANCE` (retired items stay retired), returning a loan only releases the item once no ticket is unresolved, and an administrator cannot put an item back into circulation while either an active loan or an unresolved ticket exists.
 
 ### Users
 - `GET /api/users`

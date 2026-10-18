@@ -72,16 +72,18 @@ export default function KioskPage() {
   }, [scannedItem])
 
   // Lookup equipment by tag
-  const lookupTag = async (rawTag: string) => {
+  const lookupTag = async (rawTag: string, forceRefresh = false): Promise<EquipmentItem | null> => {
     const tag = rawTag.trim()
-    if (!tag) return
+    if (!tag) return null
     setError('')
     setNotice('')
     setLoading(true)
 
     try {
       // Find in existing catalogue or fetch fresh
-      let item = allEquipment.find((e) => e.assetTag.toLowerCase() === tag.toLowerCase() || String(e.id) === tag)
+      let item = forceRefresh
+        ? undefined
+        : allEquipment.find((e) => e.assetTag.toLowerCase() === tag.toLowerCase() || String(e.id) === tag)
       if (!item) {
         const fresh = await apiRequest<EquipmentItem[]>('/api/equipment')
         setAllEquipment(fresh)
@@ -92,14 +94,15 @@ export default function KioskPage() {
         setError(`No equipment found with tag or ID "${tag}".`)
         setScannedItem(null)
         setActiveLoan(null)
-        return
+        return null
       }
 
       setScannedItem(item)
       setRecentScans((prev) => Array.from(new Set([item!.assetTag, ...prev])).slice(0, 5))
 
-      // If in use, fetch active loan transaction
-      if (item.status === 'IN_USE') {
+      // Items that are checked out still need their loan record, even when a damage ticket has already
+      // moved them to maintenance: without it the station cannot check the item back in.
+      if (item.status === 'IN_USE' || item.status === 'MAINTENANCE') {
         const transactions = await apiRequest<LoanTransaction[]>('/api/transactions')
         const loan = transactions.find((t) => t.equipmentId === item!.id && !t.returnedAt) ?? null
         setActiveLoan(loan)
@@ -110,8 +113,10 @@ export default function KioskPage() {
       if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
         navigator.vibrate(60)
       }
+      return item
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Lookup failed.')
+      return null
     } finally {
       setLoading(false)
       setTagInput('')
@@ -202,6 +207,7 @@ export default function KioskPage() {
   // Fast Checkout Action
   const handleFastIssue = async () => {
     if (!scannedItem || !selectedUserId) return
+    const name = scannedItem.name
     setWorking(true)
     setError('')
     try {
@@ -219,9 +225,9 @@ export default function KioskPage() {
         }),
       })
 
-      setNotice(`Successfully issued ${scannedItem.name} (due ${dueAt.toLocaleDateString()}).`)
-      // Refresh item state
-      await lookupTag(scannedItem.assetTag)
+      // Refresh item state, then report the result (lookup clears any pending message)
+      await lookupTag(scannedItem.assetTag, true)
+      setNotice(`Successfully issued ${name} (due ${dueAt.toLocaleDateString()}).`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not issue equipment.')
     } finally {
@@ -232,14 +238,19 @@ export default function KioskPage() {
   // Fast Return Action
   const handleFastReturn = async () => {
     if (!scannedItem || !activeLoan) return
+    const name = scannedItem.name
     setWorking(true)
     setError('')
     try {
       await apiRequest<LoanTransaction>(`/api/transactions/${activeLoan.id}/return`, {
         method: 'PUT',
       })
-      setNotice(`Successfully checked in ${scannedItem.name}. Equipment is now AVAILABLE.`)
-      await lookupTag(scannedItem.assetTag)
+      const refreshed = await lookupTag(scannedItem.assetTag, true)
+      setNotice(
+        refreshed && refreshed.status !== 'AVAILABLE'
+          ? `Checked in ${name}. It stays ${refreshed.status.replaceAll('_', ' ').toLowerCase()} until its maintenance work is resolved.`
+          : `Successfully checked in ${name}. Equipment is now AVAILABLE.`,
+      )
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not return equipment.')
     } finally {
@@ -251,6 +262,7 @@ export default function KioskPage() {
   const handleOpenMaintenance = async (e: FormEvent) => {
     e.preventDefault()
     if (!scannedItem || !maintTitle.trim()) return
+    const name = scannedItem.name
     setWorking(true)
     setError('')
     try {
@@ -265,8 +277,8 @@ export default function KioskPage() {
       setMaintenanceOpen(false)
       setMaintTitle('')
       setMaintDetails('')
-      setNotice(`Maintenance ticket opened for ${scannedItem.name}. Item marked for service.`)
-      await lookupTag(scannedItem.assetTag)
+      await lookupTag(scannedItem.assetTag, true)
+      setNotice(`Maintenance ticket opened for ${name}. Item marked for service.`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not submit maintenance ticket.')
     } finally {
@@ -468,7 +480,7 @@ export default function KioskPage() {
 
               {/* Status details & Contextual action workflows */}
               <div className="mt-5">
-                {scannedItem.status === 'AVAILABLE' ? (
+                {scannedItem.status === 'AVAILABLE' && !activeLoan ? (
                   /* AVAILABLE: Express Checkout Form */
                   <div className="space-y-4 rounded border border-emerald-400/20 bg-emerald-950/10 p-4">
                     <div className="flex items-center gap-2">
@@ -551,8 +563,8 @@ export default function KioskPage() {
                       </button>
                     </div>
                   </div>
-                ) : scannedItem.status === 'IN_USE' ? (
-                  /* IN_USE: Express Return / Check-in */
+                ) : activeLoan || scannedItem.status === 'IN_USE' ? (
+                  /* On loan: Express Return / Check-in — shown even when a damage ticket moved the item to service */
                   <div className="space-y-4 rounded border border-[#9a80ff]/20 bg-[#292244]/20 p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">

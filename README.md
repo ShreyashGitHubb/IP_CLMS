@@ -186,9 +186,9 @@ Base URL for local development: `http://localhost:8080`.
 | `POST` | `/api/auth/login` | Check credentials | Finds email and checks submitted password against BCrypt hash |
 | `GET` | `/api/equipment` | List equipment | Returns equipment records |
 | `GET` | `/api/equipment/{id}` | Get equipment | Returns record or not-found response |
-| `POST` | `/api/equipment` | Add equipment | Creates a record |
-| `PUT` | `/api/equipment/{id}` | Update equipment | Updates a record |
-| `DELETE` | `/api/equipment/{id}` | Remove equipment | Deletes a record |
+| `POST` | `/api/equipment` | Add equipment | Creates a record; a duplicate asset tag is rejected as a conflict |
+| `PUT` | `/api/equipment/{id}` | Update equipment | Updates a record. Returning an item to circulation (`AVAILABLE`/`IN_USE`) is refused with `409` while an active loan or unresolved maintenance ticket exists; repeat the call with `?closeMaintenance=true` to resolve the open tickets and save in one step |
+| `DELETE` | `/api/equipment/{id}` | Remove equipment | Deletes a record; records with history need `?force=true` |
 | `GET` | `/api/users` | List users | Returns user summaries, not password hashes |
 | `GET` | `/api/transactions` | List transactions | Returns transaction records |
 | `POST` | `/api/transactions` | Create transaction | Persists a transaction record |
@@ -268,10 +268,10 @@ sequenceDiagram
 | `/sign-in` | Submit email and password to `/api/auth/login` | Available; stores returned token and user data in browser local storage |
 | `/sign-up` | Create an account through `/api/auth/register` | Available; backend assigns member role |
 | `/dashboard` | Role-aware operational overview | Live inventory, request, loan, and member counts |
-| `/equipment` | Catalogue | Search/filter, admin create/update/delete, member request submission |
+| `/equipment` | Catalogue | Search/filter, admin create/update/delete, member request submission; saving an item back into circulation asks to close open maintenance tickets first |
 | `/requests` | Request queue/history | Member-scoped request list; admin approve/reject |
 | `/transactions` | Loan ledger | Role-scoped records and owner/admin return action |
-| `/maintenance` | Service status | Admin updates equipment between maintenance and available states |
+| `/maintenance` | Service status | Admin logs incidents and moves equipment between maintenance and available states; one unresolved ticket per item |
 | `/students` | Account directory | Admin-only live user list and sign-up link |
 | `/calendar` | Due-date calendar | Active loan due dates from persisted transactions |
 | `/reports` | Operational reports | Metrics derived from equipment, users, and transactions |

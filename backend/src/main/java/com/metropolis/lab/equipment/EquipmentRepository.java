@@ -5,4 +5,5 @@ import java.util.Optional;
 
 public interface EquipmentRepository extends JpaRepository<Equipment, Long> {
   Optional<Equipment> findByAssetTag(String assetTag);
+  Optional<Equipment> findFirstByAssetTagIgnoreCase(String assetTag);
 }

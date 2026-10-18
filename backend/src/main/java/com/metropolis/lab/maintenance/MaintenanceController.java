@@ -49,6 +49,9 @@ public class MaintenanceController {
   public MaintenanceTicket create(@Valid @RequestBody CreateTicket request, @RequestAttribute("currentUser") User user) {
     requireAdmin(user);
     Equipment item = equipment.findById(request.equipmentId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
+    if (tickets.existsByEquipmentIdAndStatusNot(item.getId(), MaintenanceTicketRepository.RESOLVED)) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "This equipment already has an unresolved maintenance ticket. Resolve the open ticket before logging another incident.");
+    }
     MaintenanceTicket ticket = new MaintenanceTicket();
     ticket.setEquipmentId(item.getId());
     ticket.setOpenedBy(user.getId());
@@ -56,8 +59,11 @@ public class MaintenanceController {
     ticket.setDetails(request.details().trim());
     ticket.setAssignedTechnician(request.assignedTechnician());
     ticket.setRepairCost(request.repairCost());
-    item.setStatus(EquipmentStatus.MAINTENANCE);
-    equipment.save(item);
+    // A retired item keeps its retired state: logging a fault must not put it back into circulation.
+    if (item.getStatus() != EquipmentStatus.RETIRED) {
+      item.setStatus(EquipmentStatus.MAINTENANCE);
+      equipment.save(item);
+    }
     MaintenanceTicket saved = tickets.save(ticket);
     users.findAll().stream().filter(account -> "MEMBER".equals(account.getRole())).forEach(account ->
       notifications.create(account.getId(), "Equipment sent to maintenance", item.getName() + " is unavailable for service: " + saved.getTitle())
@@ -80,11 +86,11 @@ public class MaintenanceController {
     }
     MaintenanceTicket saved = tickets.save(ticket);
     Equipment item = equipment.findById(ticket.getEquipmentId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Equipment not found."));
-    if ("RESOLVED".equals(request.status()) && !tickets.existsByEquipmentIdAndStatusNot(item.getId(), "RESOLVED")) {
+    if ("RESOLVED".equals(request.status()) && !tickets.existsByEquipmentIdAndStatusNot(item.getId(), MaintenanceTicketRepository.RESOLVED)) {
       if (item.getStatus() == EquipmentStatus.MAINTENANCE) {
         item.setStatus(transactions.existsByEquipmentIdAndReturnedAtIsNull(item.getId()) ? EquipmentStatus.IN_USE : EquipmentStatus.AVAILABLE);
       }
-    } else if (!"RESOLVED".equals(request.status())) {
+    } else if (!"RESOLVED".equals(request.status()) && item.getStatus() != EquipmentStatus.RETIRED) {
       item.setStatus(EquipmentStatus.MAINTENANCE);
     }
     equipment.save(item);
