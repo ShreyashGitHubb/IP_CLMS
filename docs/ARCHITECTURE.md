@@ -155,6 +155,17 @@ Two details matter for correctness. A locking query never refreshes an entity th
 
 Both are guarded with an `INFORMATION_SCHEMA` check, so applying the column by hand and then deploying does not fail Flyway. `schema.sql` and `schema-mysql.sql` carry the column for fresh databases.
 
+## 5.2 Transactional email
+
+`MailService` sends through the Resend HTTP API with Spring's `RestClient`, so the feature adds no Maven dependency and leaves the build untouched. It is deliberately the weakest link in the request path:
+
+- it is inert unless `MAIL_ENABLED=true` **and** `RESEND_API_KEY` is set, which is why the existing tests need no provider;
+- sends are registered as an `afterCommit` synchronization, so an aborted transaction never emails anyone and the provider call never runs while an equipment row lock is held;
+- delivery runs on a small bounded thread pool, and every failure is caught and logged, so a provider outage cannot turn a successful operation into an error;
+- `MailTemplates` escapes all interpolated user supplied text.
+
+`OverdueLoanMailer` is a `@Scheduled` job (cron configurable through `MAIL_OVERDUE_CRON`) that emails members whose loan passed its due date; it returns immediately when email is disabled. In-app notifications remain in place for every one of these events.
+
 ## 6. Design principles
 
 ## 6. Design principles

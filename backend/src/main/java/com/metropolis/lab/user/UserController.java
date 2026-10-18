@@ -12,6 +12,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.http.ResponseEntity;
 import com.metropolis.lab.auth.AuthTokenService;
 import com.metropolis.lab.auth.AuthSessionRepository;
+import com.metropolis.lab.mail.MailService;
 import com.metropolis.lab.notification.NotificationService;
 import com.metropolis.lab.notification.NotificationRepository;
 import com.metropolis.lab.transaction.TransactionRepository;
@@ -30,9 +31,10 @@ public class UserController {
   private final TransactionRepository transactions;
   private final AuthSessionRepository sessions;
   private final NotificationRepository notificationRepository;
+  private final MailService mail;
   private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
   private final SecureRandom secureRandom = new SecureRandom();
-  public UserController(UserRepository repository, AuthTokenService tokenService, NotificationService notifications, TransactionRepository transactions, AuthSessionRepository sessions, NotificationRepository notificationRepository){this.repository = repository; this.tokenService = tokenService; this.notifications = notifications; this.transactions = transactions; this.sessions = sessions; this.notificationRepository = notificationRepository;}
+  public UserController(UserRepository repository, AuthTokenService tokenService, NotificationService notifications, TransactionRepository transactions, AuthSessionRepository sessions, NotificationRepository notificationRepository, MailService mail){this.repository = repository; this.tokenService = tokenService; this.notifications = notifications; this.transactions = transactions; this.sessions = sessions; this.notificationRepository = notificationRepository; this.mail = mail;}
   @GetMapping public List<UserSummary> list(@RequestAttribute("currentUser") User currentUser){
     if (!"ADMIN".equals(currentUser.getRole())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access is required.");
@@ -55,6 +57,7 @@ public class UserController {
     user.setMustChangePassword(true);
     User saved = repository.save(user);
     notifications.create(saved.getId(), "Lab account created", "An administrator created your " + saved.getRole().toLowerCase() + " account. Sign in using the credentials they provided.");
+    mail.accountCreated(saved, request.password());
     return ResponseEntity.status(HttpStatus.CREATED).body(UserSummary.from(saved));
   }
 
@@ -124,6 +127,7 @@ public class UserController {
     repository.save(user);
     tokenService.revokeAll(user.getId());
     notifications.create(user.getId(), "Password reset", "An administrator reset your password. Sign in with the temporary password they provided and change it in Settings.");
+    mail.temporaryPasswordReset(user, temporaryPassword);
     return new TemporaryPassword(user.getId(), temporaryPassword);
   }
 

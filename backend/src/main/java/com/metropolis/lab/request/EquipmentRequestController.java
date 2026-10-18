@@ -7,6 +7,7 @@ import com.metropolis.lab.transaction.Transaction;
 import com.metropolis.lab.transaction.TransactionRepository;
 import com.metropolis.lab.user.User;
 import com.metropolis.lab.user.UserRepository;
+import com.metropolis.lab.mail.MailService;
 import com.metropolis.lab.notification.NotificationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -27,13 +28,15 @@ public class EquipmentRequestController {
   private final TransactionRepository transactions;
   private final NotificationService notifications;
   private final UserRepository users;
+  private final MailService mail;
 
-  public EquipmentRequestController(EquipmentRequestRepository requests, EquipmentRepository equipment, TransactionRepository transactions, NotificationService notifications, UserRepository users) {
+  public EquipmentRequestController(EquipmentRequestRepository requests, EquipmentRepository equipment, TransactionRepository transactions, NotificationService notifications, UserRepository users, MailService mail) {
     this.requests = requests;
     this.equipment = equipment;
     this.transactions = transactions;
     this.notifications = notifications;
     this.users = users;
+    this.mail = mail;
   }
 
   @GetMapping
@@ -62,6 +65,7 @@ public class EquipmentRequestController {
     users.findAllByRoleAndActive("ADMIN", true).forEach(admin ->
       notifications.create(admin.getId(), "New equipment request", message)
     );
+    mail.newRequest(users.findAllByRoleAndActive("ADMIN", true), user.getName(), item.getName(), request.getPurpose());
     return saved;
   }
 
@@ -112,8 +116,11 @@ public class EquipmentRequestController {
     request.setStatus(decision.status());
     request.setReviewedAt(Instant.now());
     EquipmentRequest saved = requests.save(request);
+    boolean approved = "APPROVED".equals(decision.status());
     notifications.create(request.getUserId(), "Equipment request " + decision.status().toLowerCase(),
-      "Your request for " + ("APPROVED".equals(decision.status()) ? "equipment was approved and issued." : "equipment was rejected."));
+      "Your request for " + (approved ? "equipment was approved and issued." : "equipment was rejected."));
+    users.findById(request.getUserId()).ifPresent(requester ->
+      mail.requestDecision(requester, equipment.findById(request.getEquipmentId()).map(Equipment::getName).orElse("the equipment"), approved));
     return saved;
   }
 

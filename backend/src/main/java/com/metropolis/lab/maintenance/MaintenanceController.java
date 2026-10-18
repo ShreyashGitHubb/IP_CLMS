@@ -5,6 +5,7 @@ import com.metropolis.lab.equipment.EquipmentRepository;
 import com.metropolis.lab.equipment.EquipmentStatus;
 import com.metropolis.lab.user.User;
 import com.metropolis.lab.user.UserRepository;
+import com.metropolis.lab.mail.MailService;
 import com.metropolis.lab.notification.NotificationService;
 import com.metropolis.lab.transaction.TransactionRepository;
 import jakarta.validation.Valid;
@@ -28,13 +29,15 @@ public class MaintenanceController {
   private final UserRepository users;
   private final NotificationService notifications;
   private final TransactionRepository transactions;
+  private final MailService mail;
 
-  public MaintenanceController(MaintenanceTicketRepository tickets, EquipmentRepository equipment, UserRepository users, NotificationService notifications, TransactionRepository transactions) {
+  public MaintenanceController(MaintenanceTicketRepository tickets, EquipmentRepository equipment, UserRepository users, NotificationService notifications, TransactionRepository transactions, MailService mail) {
     this.tickets = tickets;
     this.equipment = equipment;
     this.users = users;
     this.notifications = notifications;
     this.transactions = transactions;
+    this.mail = mail;
   }
 
   @GetMapping
@@ -65,9 +68,11 @@ public class MaintenanceController {
       equipment.save(item);
     }
     MaintenanceTicket saved = tickets.save(ticket);
-    users.findAll().stream().filter(account -> "MEMBER".equals(account.getRole())).forEach(account ->
+    List<User> members = users.findAll().stream().filter(account -> "MEMBER".equals(account.getRole())).toList();
+    members.forEach(account ->
       notifications.create(account.getId(), "Equipment sent to maintenance", item.getName() + " is unavailable for service: " + saved.getTitle())
     );
+    mail.maintenanceStarted(members, item.getName(), saved.getTitle());
     return saved;
   }
 
@@ -101,9 +106,12 @@ public class MaintenanceController {
         case MAINTENANCE -> item.getName() + " has one resolved ticket but remains unavailable because other maintenance is still open.";
         case RETIRED -> item.getName() + " has completed maintenance but remains retired.";
       };
-      users.findAll().stream().filter(account -> "MEMBER".equals(account.getRole())).forEach(account ->
+      List<User> members = users.findAll().stream().filter(account -> "MEMBER".equals(account.getRole())).toList();
+      members.forEach(account ->
         notifications.create(account.getId(), "Maintenance completed", statusMessage)
       );
+      // The notification carries the whole sentence; the email gets the clause after the equipment name.
+      mail.maintenanceCompleted(members, item.getName(), statusMessage.substring(item.getName().length() + 1));
     }
     return saved;
   }

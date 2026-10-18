@@ -263,6 +263,60 @@ mysql --host=<host> --user=<user> --password --database=<db> \
 
 Both files check `INFORMATION_SCHEMA` before altering anything, so running either one twice — or running the manual script before Flyway sees the migration — changes nothing on the second pass. The manual script also ends with a read-only query that lists any equipment row already inconsistent (marked in use without a loan, available while it is on loan, or available with an unresolved ticket). H2 development databases need neither file: `schema.sql` creates the column in memory on every start.
 
+### Transactional email
+
+Account, request, maintenance, and overdue messages are sent from the project's own domain through the Resend HTTP API. The feature is **off by default**: with `MAIL_ENABLED` unset nothing is sent and every endpoint behaves exactly as before.
+
+| Trigger | Recipient | Message |
+|---|---|---|
+| Administrator creates an account | New member | Sign-in email and temporary password |
+| Administrator resets a password | Account holder | Temporary password and a note that other sessions were revoked |
+| Member submits an equipment request | Every active administrator | Requester, equipment, and purpose |
+| Administrator approves a request | Requesting member | Approval and that the item was issued |
+| Administrator rejects a request | Requesting member | Rejection |
+| Maintenance ticket is opened | Every member | Equipment and fault title |
+| Maintenance ticket is resolved | Every member | Whether the item is available, still on loan, or retired |
+| Daily scheduled job | Borrower of each overdue loan | Equipment and the date it was due |
+
+Every message is also still written to the in-app notification inbox; email is an addition, never a replacement.
+
+**Delivery guarantees.** A send is queued only after the database transaction commits, so an aborted operation never announces itself, and the HTTP call runs on a two-thread pool so a slow provider cannot hold an equipment row lock open or delay the API response. Failures are logged and swallowed — a provider outage cannot turn a successful equipment, request, or maintenance operation into an error. User supplied text is HTML escaped before it reaches an inbox.
+
+#### DNS: receiving is not sending
+
+Cloudflare Email Routing makes a domain **receive** mail by forwarding it to a real inbox. It does not authorise anything to send as `@clms.shreyashvishwakarma.in`. Sending needs a provider and three record types, added in Cloudflare DNS:
+
+| Record | Name | Purpose |
+|---|---|---|
+| SPF (`TXT`) | `@` or `mail` | Lists the mail servers allowed to send for the domain |
+| DKIM (`TXT`) | the selector Resend gives, e.g. `resend._domainkey` | Cryptographically signs outgoing mail |
+| DMARC (`TXT`) | `_dmarc` | Tells receivers what to do when SPF or DKIM fails |
+
+Add the exact values Resend shows after you add the domain there. **SPF allows only one record per domain**, so if Email Routing already created one, merge Resend's entry into that existing value instead of adding a second `v=spf1` record. Start DMARC at `p=none` with reporting, then tighten it once delivery is confirmed.
+
+#### Configuration
+
+```
+MAIL_ENABLED=true
+RESEND_API_KEY=re_xxxxxxxx
+MAIL_FROM=CLMS Lab <noreply@clms.shreyashvishwakarma.in>
+MAIL_SIGN_IN_URL=https://clms.shreyashvishwakarma.in/sign-in
+MAIL_OVERDUE_CRON=0 15 9 * * *
+MAIL_TIME_ZONE=Asia/Kolkata
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MAIL_ENABLED` | `false` | Master switch. Both it and a key must be present before anything is sent |
+| `RESEND_API_KEY` | empty | Resend API key. Sending stays off while this is empty |
+| `MAIL_ENDPOINT` | `https://api.resend.com/emails` | Provider endpoint |
+| `MAIL_FROM` | `CLMS Lab <noreply@clms.shreyashvishwakarma.in>` | Verified sender identity |
+| `MAIL_SIGN_IN_URL` | `https://clms.shreyashvishwakarma.in/sign-in` | Button target in credential emails |
+| `MAIL_OVERDUE_CRON` | `0 15 9 * * *` | When the overdue reminder job runs |
+| `MAIL_TIME_ZONE` | `Asia/Kolkata` | Zone the reminder time and due dates are rendered in |
+
+Set the first two in Render under the backend service environment variables. Nothing else in the project depends on them, so a missing or invalid key leaves the application working with in-app notifications only.
+
 ### Example health response
 
 ```json
@@ -471,6 +525,8 @@ The backend test suite includes context startup, authentication, role restrictio
 
 `ConcurrentCheckoutTest` runs the races above on real threads: two simultaneous checkouts of one asset, two simultaneous approvals of two requests for one asset, two simultaneous check-ins of one loan, a stale edit rejected against a newer version, and the `version` column advancing on every change.
 
+`MailServiceTest` covers the email feature in isolation: that it stays off without an API key, that an unreachable provider never propagates a failure, that user supplied text is escaped, and that each template carries the details its reader needs.
+
 ## 9. Current Scope and Limitations
 
 ### Implemented
@@ -486,6 +542,7 @@ The backend test suite includes context startup, authentication, role restrictio
 - Calendar and date-filtered CSV reports derive from actual event, equipment, and transaction records; the workspace dashboard shows live API data.
 - H2 schema for local development and Flyway-managed MySQL schema for deployment.
 - Concurrency control on equipment: issue, return, approval, and cancellation take a `SELECT ... FOR UPDATE` row lock so simultaneous actions are serialized, and the `@Version` column turns a lost update into a `409` instead of a silent overwrite.
+- Optional transactional email from the project's own domain for account creation, password resets, request decisions, maintenance updates, and daily overdue reminders; disabled and inert until a provider key is configured.
 - Equipment status is guarded consistently across maintenance tickets, loans, and administrator edits; a refused transition returns `409` with an actionable message and a confirmed retry path.
 - One asset cannot hold two open loans, cannot be issued while it is still out, and cannot return to circulation while a maintenance ticket is unresolved.
 - Every API error returns the same `{timestamp, error}` shape, so the interface can display why a request was refused.
@@ -493,8 +550,8 @@ The backend test suite includes context startup, authentication, role restrictio
 
 ### Not yet implemented or not verified for production
 
-- Email-based password recovery, email verification, invitation delivery, and outbound email notifications require a mail provider and secrets, which are not configured. Admins can issue one-time temporary passwords in-app.
-- Notifications are in-app only; web push, email, and SMS delivery are not configured.
+- Email-based password recovery and address verification are still not implemented: an administrator issues a temporary password and the email only delivers it. There is no self-service "forgot password" link or verification step, so a member who loses access still needs an administrator.
+- Notifications remain in-app; the outbound email added for accounts, requests, maintenance, and overdue loans is opt-in per deployment, and web push and SMS are not configured.
 - Audit records cover successful authenticated mutations; they do not store before/after field diffs or read-only access events.
 - Reports support selected date-range transaction aggregates and CSV, but do not retain historical snapshots.
 - Browser sessions use local storage; a stable `AUTH_TOKEN_SECRET` is required in Render for sessions to survive restarts and work across instances.
