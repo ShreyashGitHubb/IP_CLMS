@@ -12,6 +12,30 @@ CLMS is a web application prototype for tracking laboratory users, equipment inv
 
 ---
 
+## Demo Login Credentials
+
+Use the following demo accounts to explore the CLMS dashboard and test its features and functionality.
+
+| Role | Email | Password |
+|---|---|---|
+| Administrator | `admin@clms.local` | `Admin@123` |
+| Member | `member@clms.local` | `Member@123` |
+
+### How to Access
+1. Open the deployed CLMS application.
+2. Navigate to the **Sign In** page.
+3. Enter the credentials for either demo account.
+4. Explore the dashboard and features available to that role.
+
+### Available Access
+
+- **Administrator:** Manage laboratory equipment, process equipment requests, and oversee inventory and transactions.
+- **Member:** Browse available equipment, submit equipment requests, and view personal requests and loan transactions.
+
+> **Note:** These credentials are provided for demonstration and evaluation purposes only. Please use demo data and avoid entering sensitive or personal information.
+
+---
+
 ## Contents
 
 - [1. Project Overview](#1-project-overview)
