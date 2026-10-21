@@ -10,16 +10,18 @@ set -euo pipefail
 # ----------------- Configuration Variables -----------------
 AWS_REGION="ap-south-1"                 # Mumbai region
 KEY_NAME="clms-key"
-INSTANCE_TYPE="t2.micro"                # Free Tier eligible
+INSTANCE_TYPE="t2.micro"                # Free Tier eligible (750 hours/month)
 UBUNTU_AMI_ID=""                        # Auto-resolved below
-BUCKET_NAME="clms-equipment-docs-${RANDOM}"
+ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+BUCKET_NAME="clms-equipment-docs-${ACCOUNT_ID}"
 EC2_SG_NAME="clms-ec2-sg"
-RDS_SG_NAME="clms-rds-sg"
 IAM_ROLE_NAME="CLMS-EC2-Role"
 IAM_PROFILE_NAME="CLMS-EC2-Profile"
 
 echo "=== [Step 1] Verifying AWS CLI and Credentials ==="
 aws sts get-caller-identity --output table
+echo "Target AWS Region : ${AWS_REGION}"
+echo "S3 Bucket Name    : ${BUCKET_NAME}"
 
 # ----------------- Step 2: IAM Role & Profile (Exp 12) -----------------
 echo "=== [Step 2] Creating IAM EC2 Role and Instance Profile (Exp 12) ==="
